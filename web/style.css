@@ -1,0 +1,8 @@
+html, body { margin:0; width:100%; height:100%; overflow:hidden; background:transparent; font-family:Arial,sans-serif; color:white; }
+body { display:flex; align-items:flex-start; justify-content:flex-start; }
+.panel { margin:24px; width:300px; padding:18px 20px; border-radius:12px; background:rgba(0,0,0,.72); box-sizing:border-box; }
+.title { font-size:14px; letter-spacing:.18em; opacity:.7; margin-bottom:14px; }
+.row { display:flex; justify-content:space-between; gap:16px; padding:7px 0; font-size:18px; }
+.row span { opacity:.65; }
+#status.online { color:#8ff0a4; }
+#status.offline { color:#ff7b72; }
