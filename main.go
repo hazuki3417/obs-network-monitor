@@ -3,50 +3,26 @@ package main
 import (
 	"context"
 	"embed"
-	"encoding/json"
 	"io/fs"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/gorilla/websocket"
 
+	"obs-network-monitor/internal/adapter"
 	"obs-network-monitor/internal/config"
+	"obs-network-monitor/internal/monitor"
+	"obs-network-monitor/internal/probe"
 )
 
 //go:embed web/*
 var webFS embed.FS
 
-type Status struct {
-	Online    bool   `json:"online"`
-	LatencyMS int64  `json:"latencyMs"`
-	CheckedAt string `json:"checkedAt"`
-}
-
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool { return true },
 }
 
-func checkNetwork(target string) Status {
-	start := time.Now()
-	client := http.Client{Timeout: 3 * time.Second}
-	resp, err := client.Get(target)
-	latency := time.Since(start).Milliseconds()
-
-	online := err == nil
-	if resp != nil {
-		resp.Body.Close()
-		online = online && resp.StatusCode >= 200 && resp.StatusCode < 400
-	}
-
-	return Status{
-		Online:    online,
-		LatencyMS: latency,
-		CheckedAt: time.Now().Format(time.RFC3339),
-	}
-}
-
-func websocketHandler(httpTarget string) http.HandlerFunc {
+func websocketHandler(source *monitor.Monitor) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -55,16 +31,12 @@ func websocketHandler(httpTarget string) http.HandlerFunc {
 		}
 		defer conn.Close()
 
-		ticker := time.NewTicker(time.Second)
-		defer ticker.Stop()
-
-		for {
-			status := checkNetwork(httpTarget)
-			payload, _ := json.Marshal(status)
-			if err := conn.WriteMessage(websocket.TextMessage, payload); err != nil {
+		updates, unsubscribe := source.Subscribe()
+		defer unsubscribe()
+		for snapshot := range updates {
+			if err := conn.WriteJSON(snapshot); err != nil {
 				return
 			}
-			<-ticker.C
 		}
 	}
 }
@@ -79,9 +51,16 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	networkMonitor := monitor.New(
+		adapter.NewInspector(),
+		probe.NewEngine(appConfig.ICMPTarget, appConfig.HTTPTarget),
+		appConfig.ICMPTarget,
+		log.Default(),
+	)
+	go networkMonitor.Run(context.Background())
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("/ws", websocketHandler(appConfig.HTTPTarget))
+	mux.HandleFunc("/ws", websocketHandler(networkMonitor))
 	mux.Handle("/", http.FileServer(http.FS(static)))
 
 	addr := "127.0.0.1:8080"
