@@ -21,14 +21,14 @@ Windows PCが現在使用しているネットワークアダプターとイン�
 
 ## すぐに使う
 
-### GitHub Actionsの成果物
+### GitHub Release
 
-1. GitHubの **Actions** から成功した **Quality Gate** 実行を開く。
-2. Artifactsの `obs-network-monitor-windows-x64` をダウンロードして展開する。
-3. `obs-network-monitor.exe` を通常ユーザー権限で実行する。
+1. GitHubの [Releases](https://github.com/hazuki3417/obs-network-monitor/releases) から使用するバージョンを開く。
+2. `obs-network-monitor-windows-x64.zip` とチェックサムファイルをダウンロードする。
+3. ZIPを展開し、`obs-network-monitor.exe` を通常ユーザー権限で実行する。
 4. ブラウザで `http://127.0.0.1:8080/` を開く。
 
-成果物にはexe、README、設定例が含まれます。現在の成果物は署名されていないため、Windowsが発行元を確認できない旨を表示する場合があります。
+ZIPにはexe、README、設定例が含まれます。成果物は署名されていないため、Windowsが発行元を確認できない旨を表示する場合があります。必要に応じて同じReleaseの `.sha256` ファイルで整合性を確認してください。
 
 ### ソースから実行
 
@@ -45,6 +45,10 @@ go build -trimpath -o obs-network-monitor.exe .
 ```
 
 起動中はコンソールを閉じないでください。終了するときは `Ctrl+C` を押します。
+
+## リリース
+
+正式版は `main` のコミットへ `vMAJOR.MINOR.PATCH` 形式のタグをpushすると、テスト済みWindows x64 ZIPとSHA-256を添付したGitHub Releaseとして自動公開されます。メンテナー向けの手順と安全条件は [リリース手順](docs/releasing.md) を参照してください。
 
 ## 設定
 
