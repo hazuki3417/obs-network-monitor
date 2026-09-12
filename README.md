@@ -35,6 +35,10 @@ HTML/CSS/JavaScriptはGoの `embed` によりexeへ埋め込まれます。
 
 GitHub Actionsの画面から手動実行することもできます。
 
+## MVP仕様
+
+PCネットワークモニターの合意済み仕様は [docs/network-monitor-mvp.md](docs/network-monitor-mvp.md) を参照してください。
+
 ## 現在の表示内容
 - ONLINE / OFFLINE
 - HTTPSリクエストの応答時間（簡易Latency）
