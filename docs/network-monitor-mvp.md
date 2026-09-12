@@ -156,6 +156,42 @@ WebSocketクライアントは共有モニターの最新スナップショッ�
 - 直近60回の時刻、成否、RTT
 - スナップショット生成時刻
 
+WebSocketでは次の構造をJSONで配信する。測定成功値がまだない場合、`latestLatencyMs` と `jitterMs` は `null` とする。遅いクライアント向けに過去のスナップショットを滞留させず、未送信値を最新値で置き換える。
+
+```json
+{
+  "nic": {
+    "name": "Ethernet",
+    "description": "Network Adapter",
+    "interfaceIndex": 12,
+    "interfaceLuid": 123456,
+    "state": "connected",
+    "transmitLinkSpeedBps": 1000000000,
+    "receiveLinkSpeedBps": 1000000000
+  },
+  "statistics": {
+    "method": "icmp",
+    "target": "8.8.8.8",
+    "latestLatencyMs": 12,
+    "jitterMs": 1.5,
+    "failureMetric": "packetLoss",
+    "failureRatePercent": 0
+  },
+  "history": [
+    {
+      "method": "icmp",
+      "target": "8.8.8.8",
+      "success": true,
+      "rttMs": 12,
+      "checkedAt": "2026-09-12T10:00:00Z"
+    }
+  ],
+  "generatedAt": "2026-09-12T10:00:00Z"
+}
+```
+
+`failureMetric` はICMP時に `packetLoss`、HTTP時に `requestFailure` とする。購読クライアントごとに容量1の通知を持たせ、配信遅延や切断を共有モニターの測定処理から分離する。
+
 ## 8. UI
 
 OBS Browser Sourceで判読できるコンパクトな表示とする。
