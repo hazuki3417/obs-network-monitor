@@ -1,0 +1,66 @@
+name: Quality Gate
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+  push:
+    branches:
+      - develop
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-build:
+    name: Windows build and smoke test
+    runs-on: windows-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build Windows executable
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $env:GOOS = "windows"
+          $env:GOARCH = "amd64"
+          go build -trimpath -o dist/obs-network-monitor.exe .
+          if (-not (Test-Path dist/obs-network-monitor.exe)) {
+            throw "Windows executable was not created."
+          }
+
+      - name: Run Windows integration smoke tests
+        shell: pwsh
+        run: ./.github/scripts/windows-smoke-test.ps1 -ExecutablePath ./dist/obs-network-monitor.exe
+
+      - name: Package Windows artifact
+        shell: pwsh
+        run: |
+          $package = "dist/obs-network-monitor-windows-x64"
+          New-Item -ItemType Directory -Force $package | Out-Null
+          Copy-Item dist/obs-network-monitor.exe $package/
+          Copy-Item config.example.json $package/
+          Copy-Item README.md $package/
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: obs-network-monitor-windows-x64
+          path: dist/obs-network-monitor-windows-x64/
+          if-no-files-found: error
+          retention-days: 7
