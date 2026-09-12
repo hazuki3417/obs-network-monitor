@@ -76,7 +76,7 @@ WindowsネイティブAPIを利用し、PowerShellや外部コマンドの出力
 
 ### 5.1 ICMP
 
-通常はWindowsのICMP APIを使用し、1秒間隔でEcho Requestを1回送信する。管理者権限や `ping.exe` には依存しない。
+通常はWindowsのICMP APIを使用し、1秒間隔でEcho Requestを1回送信する。管理者権限や `ping.exe` には依存しない。実装には `IcmpCreateFile` と同期型の `IcmpSendEcho` を使用し、各測定を1秒でタイムアウトさせる。
 
 各測定は次を記録する。
 
@@ -91,7 +91,7 @@ WindowsネイティブAPIを利用し、PowerShellや外部コマンドの出力
 ICMPが3回連続で失敗した場合、HTTP測定先へ確認リクエストを送る。
 
 - HTTPが成功した場合: ICMPが利用できないと判断し、HTTP測定へ切り替える
-- HTTPも失敗した場合: インターネット疎通失敗としてICMP測定の失敗に計上する
+- HTTPも失敗した場合: インターネット疎通失敗としてICMP測定の失敗に計上し、連続失敗カウンターをリセットする。次のHTTP確認は、新たにICMPが3回連続で失敗した後に行う
 - HTTP測定中: 30秒ごとにICMPを再確認し、成功したらICMPへ戻す
 
 HTTPの応答時間にはDNS、TCP、TLSおよびHTTPサーバーの処理時間が含まれるため、ICMP RTTと同一の値として比較しない。測定方式を画面へ常に表示する。
