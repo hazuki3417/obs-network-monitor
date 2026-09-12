@@ -1,0 +1,100 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows-release:
+    name: Test, build, and publish Windows release
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out tagged commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate release tag and main ancestry
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_NAME -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') {
+            throw "Release tag must use vMAJOR.MINOR.PATCH format: $env:GITHUB_REF_NAME"
+          }
+
+          git fetch origin main --no-tags
+          git merge-base --is-ancestor $env:GITHUB_SHA origin/main
+          if ($LASTEXITCODE -ne 0) {
+            throw "Tagged commit is not contained in the main branch."
+          }
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Run tests
+        run: go test ./...
+
+      - name: Build Windows executable
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          $env:GOOS = "windows"
+          $env:GOARCH = "amd64"
+          go build -trimpath -o dist/obs-network-monitor.exe .
+          if (-not (Test-Path dist/obs-network-monitor.exe)) {
+            throw "Windows executable was not created."
+          }
+
+      - name: Run Windows integration smoke tests
+        shell: pwsh
+        run: ./.github/scripts/windows-smoke-test.ps1 -ExecutablePath ./dist/obs-network-monitor.exe
+
+      - name: Package release
+        shell: pwsh
+        run: |
+          $package = "dist/obs-network-monitor-windows-x64"
+          $archive = "dist/obs-network-monitor-windows-x64.zip"
+          $checksum = "$archive.sha256"
+
+          New-Item -ItemType Directory -Force $package | Out-Null
+          Copy-Item dist/obs-network-monitor.exe $package/
+          Copy-Item config.example.json $package/
+          Copy-Item README.md $package/
+          Compress-Archive -Path "$package/*" -DestinationPath $archive
+
+          $hash = (Get-FileHash -Path $archive -Algorithm SHA256).Hash.ToLowerInvariant()
+          "$hash  obs-network-monitor-windows-x64.zip" |
+            Set-Content -Path $checksum -Encoding ascii
+
+      - name: Create or update GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $archive = "dist/obs-network-monitor-windows-x64.zip"
+          $checksum = "$archive.sha256"
+
+          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag $archive $checksum --clobber --repo $env:GITHUB_REPOSITORY
+          }
+          else {
+            gh release create $tag $archive $checksum `
+              --verify-tag `
+              --generate-notes `
+              --title "OBS Network Monitor $tag" `
+              --repo $env:GITHUB_REPOSITORY
+          }
