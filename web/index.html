@@ -7,11 +7,81 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <main class="panel">
-    <div class="title">NETWORK</div>
-    <div class="row"><span>Status</span><strong id="status">CONNECTING</strong></div>
-    <div class="row"><span>Latency</span><strong id="latency">-- ms</strong></div>
-    <div class="row"><span>Updated</span><strong id="updated">--:--:--</strong></div>
+  <main class="panel" id="monitor-panel">
+    <header class="header">
+      <div>
+        <p class="eyebrow">OBS NETWORK MONITOR</p>
+        <h1>PC Network</h1>
+      </div>
+      <div class="stream-state" id="stream-state" data-state="connecting" aria-live="polite">
+        <span class="stream-dot" aria-hidden="true"></span>
+        <span id="stream-label">接続中</span>
+      </div>
+    </header>
+
+    <section class="nic-card" aria-labelledby="nic-heading">
+      <div class="section-heading">
+        <span id="nic-heading">ACTIVE NIC</span>
+        <span class="nic-state" id="nic-state">確認中</span>
+      </div>
+      <strong class="nic-name" id="nic-name">--</strong>
+      <p class="nic-description" id="nic-description">ネットワークアダプターを確認しています</p>
+      <div class="link-speeds">
+        <div>
+          <span class="label">UPLOAD LINK</span>
+          <strong id="tx-speed">--</strong>
+        </div>
+        <div>
+          <span class="label">DOWNLOAD LINK</span>
+          <strong id="rx-speed">--</strong>
+        </div>
+      </div>
+    </section>
+
+    <section class="metrics" aria-label="回線測定値">
+      <div class="metric">
+        <span class="label">LATENCY</span>
+        <div><strong id="latency">--</strong><span class="unit">ms</span></div>
+      </div>
+      <div class="metric">
+        <span class="label">JITTER</span>
+        <div><strong id="jitter">--</strong><span class="unit">ms</span></div>
+      </div>
+      <div class="metric">
+        <span class="label" id="failure-label">PACKET LOSS</span>
+        <div><strong id="failure-rate">--</strong><span class="unit">%</span></div>
+      </div>
+    </section>
+
+    <section class="probe-row" aria-label="測定情報">
+      <span class="method" id="probe-method">--</span>
+      <span class="target" id="probe-target">測定先を待っています</span>
+    </section>
+
+    <section class="chart-card" aria-labelledby="chart-heading">
+      <div class="section-heading">
+        <span id="chart-heading">LATENCY · LAST 60 SAMPLES</span>
+        <span id="chart-max">-- ms</span>
+      </div>
+      <svg class="chart" viewBox="0 0 480 112" role="img" aria-label="直近60回の遅延グラフ">
+        <line class="grid-line" x1="0" y1="1" x2="480" y2="1"></line>
+        <line class="grid-line" x1="0" y1="56" x2="480" y2="56"></line>
+        <line class="grid-line" x1="0" y1="111" x2="480" y2="111"></line>
+        <path id="latency-path" d=""></path>
+        <g id="latency-points"></g>
+        <text id="chart-empty" x="240" y="61" text-anchor="middle">成功した測定を待っています</text>
+      </svg>
+      <div class="chart-footer">
+        <span>60 samples ago</span>
+        <span id="sample-count">0 / 60</span>
+        <span>now</span>
+      </div>
+    </section>
+
+    <footer class="footer">
+      <span id="update-note">データを待っています</span>
+      <time id="updated">--:--:--</time>
+    </footer>
   </main>
   <script src="app.js"></script>
 </body>
