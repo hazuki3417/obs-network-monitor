@@ -1,0 +1,13 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetpack-io/devbox/0.10.1/.schema/devbox.schema.json",
+  "packages": [
+    "go@1.24",
+    "sqlc",
+    "gopls@latest"
+  ],
+  "env": {
+    "GOTOOLCHAIN": "local",
+    "GOMODCACHE": "$PWD/.devbox/gomodcache",
+    "GOCACHE": "$PWD/.devbox/gocache"
+  }
+}
