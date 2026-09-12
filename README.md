@@ -1,47 +1,119 @@
 # OBS Network Monitor
 
-OBS Browser Source向けの最小ネットワークモニターです。
+Windows PCが現在使用しているネットワークアダプターとインターネット品質を、OBS Browser Sourceまたは通常のブラウザへ表示するローカルモニターです。管理者権限、外部コマンド、外部テレメトリーを必要とせず、Web UIは実行ファイルへ埋め込まれています。
+
+## 表示内容
+
+- 現在の経路で使われるNIC名、接続状態、送受信リンク速度
+- ICMPまたはHTTPによる測定方式と測定先
+- 最新の成功遅延と、直近60回のジッター
+- ICMP時のパケット損失率、HTTP時のリクエスト失敗率
+- 失敗測定を欠損として扱う最大60サンプルの遅延グラフ
+- WebSocketの接続・再接続状態
+
+測定値をそのまま表示し、回線品質の良否は判定しません。
 
 ## 必要環境
-- Windows
-- Go 1.22以上（ビルド時のみ）
 
-## 実行
+- Windows 10またはWindows 11（64-bit）
+- OBS StudioのBrowser Source、またはWebSocket対応ブラウザ
+- Go 1.22以上（ソースからビルドする場合のみ）
+
+## すぐに使う
+
+### GitHub Actionsの成果物
+
+1. GitHubの **Actions** から成功した **Quality Gate** 実行を開く。
+2. Artifactsの `obs-network-monitor-windows-x64` をダウンロードして展開する。
+3. `obs-network-monitor.exe` を通常ユーザー権限で実行する。
+4. ブラウザで `http://127.0.0.1:8080/` を開く。
+
+成果物にはexe、README、設定例が含まれます。現在の成果物は署名されていないため、Windowsが発行元を確認できない旨を表示する場合があります。
+
+### ソースから実行
+
 ```powershell
-go mod tidy
 go run .
 ```
 
-ブラウザで `http://127.0.0.1:8080/` を開いて確認してください。
+### ソースからビルド
 
-## OBSへの追加
-1. ソース → `ブラウザ` を追加
-2. URL: `http://127.0.0.1:8080/`
-3. 幅/高さは任意（例: 400 x 200）
-
-## exeを作る
 ```powershell
-go build -o obs-network-monitor.exe .
+go test ./...
+go build -trimpath -o obs-network-monitor.exe .
+./obs-network-monitor.exe
 ```
 
-HTML/CSS/JavaScriptはGoの `embed` によりexeへ埋め込まれます。
+起動中はコンソールを閉じないでください。終了するときは `Ctrl+C` を押します。
 
-## Quality Gate
+## 設定
 
-`develop` 向けのPull Requestと `develop` へのpushでは、GitHub ActionsのWindows runnerで次を確認します。
+設定は任意です。設定しない場合はGoogleの既定測定先を使用します。変更する場合は [config.example.json](config.example.json) を `config.json` という名前で **exeと同じフォルダー** にコピーします。
+
+```json
+{
+  "icmpTarget": "8.8.8.8",
+  "httpTarget": "https://www.google.com/generate_204"
+}
+```
+
+| 項目 | 内容 |
+| --- | --- |
+| `icmpTarget` | IPv4アドレス、またはIPv4へ名前解決できるホスト名 |
+| `httpTarget` | HTTPS URL |
+
+設定は起動時に1回だけ読み込みます。変更後はアプリを再起動してください。空文字、未知のJSONフィールド、不正なURL、IPv6のみの測定先は起動エラーになります。エラー時は既定値へ自動的に戻しません。
+
+## OBSへ追加
+
+1. アプリを起動する。
+2. OBSの「ソース」で「ブラウザ」を追加する。
+3. URLを `http://127.0.0.1:8080/` にする。
+4. 幅を `560`、高さを `520` にする。
+5. 必要に応じてOBS上で縮小・配置する。
+
+ページ背景は透明です。WebSocketが切断されると最後の値を残して `再接続中` と表示し、2秒ごとに再接続します。
+
+## 測定の動作
+
+通常は1秒ごとにWindows ICMP APIで測定します。ICMPが3回連続で失敗し、HTTPは成功した場合にHTTPへ切り替わります。HTTP測定中は30秒ごとにICMPを再確認し、回復していればICMPへ戻ります。
+
+HTTP応答時間にはDNS、TCP、TLS、サーバー処理が含まれるため、ICMP RTTと同じ意味ではありません。方式を切り替える際は60サンプルの履歴をリセットし、異なる測定値を混在させません。
+
+## トラブルシューティング
+
+| 症状 | 確認事項 |
+| --- | --- |
+| 起動直後に終了する | コンソールの `load config` エラーを確認し、`config.json` のJSON・測定先・HTTPS指定を修正する |
+| `bind` エラーで起動できない | `127.0.0.1:8080` を使用している別プロセスを終了する |
+| NICが未接続・状態不明になる | インターネット経路、VPN、指定したICMP測定先へのIPv4経路を確認する |
+| HTTPへ切り替わる | ネットワークまたは測定先がICMP Echoを許可しているか確認する |
+| `再接続中` のままになる | exeが起動中か、ブラウザURLが `http://127.0.0.1:8080/` か確認する |
+| OBSで全体が見切れる | Browser Sourceを560 x 520以上にするか、ソースを縮小する |
+
+測定・NIC取得の一時エラーではプロセスを終了せず、コンソールへ原因を記録して継続します。
+
+## MVPの制約
+
+- Windows・IPv4のみ
+- 現在の経路で選ばれるNICを1つだけ表示
+- ポートは `127.0.0.1:8080` 固定で、外部PCからは接続不可
+- 直近60サンプルのみ保持し、測定結果は永続化しない
+- 設定の動的再読み込みは非対応
+- IPv6、通信量、帯域使用率、複数NIC同時表示、総合品質判定は対象外
+- HTTP測定の失敗率はパケット損失率ではない
+
+## 検証
+
+`develop` 向けPull Request、`develop` へのpush、手動実行で、Windows Quality Gateが次を検証します。
 
 - `go test ./...`
-- `obs-network-monitor.exe` のビルド
+- Windows x64実行ファイルのビルド
+- 設定なし・有効な設定での起動
+- 不正設定の起動拒否
+- 埋め込みUIのHTTP配信
+- 2つのWebSocket接続へのスナップショット配信とJSON契約
 
-GitHub Actionsの画面から手動実行することもできます。
+NIC・経路切り替え、実ネットワークでのICMP / HTTP切り替え、OBS表示は [Windows MVP 手動確認チェックリスト](docs/windows-mvp-checklist.md) を使って確認してください。
 
-## MVP仕様
-
-PCネットワークモニターの合意済み仕様は [docs/network-monitor-mvp.md](docs/network-monitor-mvp.md) を参照してください。
-
-## 現在の表示内容
-- ONLINE / OFFLINE
-- HTTPSリクエストの応答時間（簡易Latency）
-- 最終更新時刻
-
-※ LatencyはICMP Pingではなく `https://www.google.com/generate_204` へのHTTP応答時間です。今後、NIC送受信量やICMP Ping、packet loss、OBS統計などを追加できます。
+詳細な仕様は [PCネットワークモニター MVP仕様](docs/network-monitor-mvp.md) を参照してください。
