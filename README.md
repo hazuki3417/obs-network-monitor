@@ -26,6 +26,15 @@ go build -o obs-network-monitor.exe .
 
 HTML/CSS/JavaScriptはGoの `embed` によりexeへ埋め込まれます。
 
+## Quality Gate
+
+`develop` 向けのPull Requestと `develop` へのpushでは、GitHub ActionsのWindows runnerで次を確認します。
+
+- `go test ./...`
+- `obs-network-monitor.exe` のビルド
+
+GitHub Actionsの画面から手動実行することもできます。
+
 ## 現在の表示内容
 - ONLINE / OFFLINE
 - HTTPSリクエストの応答時間（簡易Latency）
