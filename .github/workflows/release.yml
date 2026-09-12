@@ -6,15 +6,15 @@ on:
       - "v*.*.*"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  windows-release:
-    name: Test, build, and publish Windows release
+  windows-build:
+    name: Test and build Windows release
     runs-on: windows-latest
     timeout-minutes: 15
 
@@ -78,23 +78,47 @@ jobs:
           "$hash  obs-network-monitor-windows-x64.zip" |
             Set-Content -Path $checksum -Encoding ascii
 
+      - name: Upload release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-assets
+          path: |
+            dist/obs-network-monitor-windows-x64.zip
+            dist/obs-network-monitor-windows-x64.zip.sha256
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    name: Publish GitHub Release
+    needs: windows-build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          name: release-assets
+          path: dist
+
       - name: Create or update GitHub Release
-        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          $tag = $env:GITHUB_REF_NAME
-          $archive = "dist/obs-network-monitor-windows-x64.zip"
-          $checksum = "$archive.sha256"
+          set -euo pipefail
+          archive="dist/obs-network-monitor-windows-x64.zip"
+          checksum="${archive}.sha256"
 
-          gh release view $tag --repo $env:GITHUB_REPOSITORY *> $null
-          if ($LASTEXITCODE -eq 0) {
-            gh release upload $tag $archive $checksum --clobber --repo $env:GITHUB_REPOSITORY
-          }
-          else {
-            gh release create $tag $archive $checksum `
-              --verify-tag `
-              --generate-notes `
-              --title "OBS Network Monitor $tag" `
-              --repo $env:GITHUB_REPOSITORY
-          }
+          if gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release upload "${RELEASE_TAG}" "${archive}" "${checksum}" \
+              --clobber \
+              --repo "${GITHUB_REPOSITORY}"
+          else
+            gh release create "${RELEASE_TAG}" "${archive}" "${checksum}" \
+              --verify-tag \
+              --generate-notes \
+              --title "OBS Network Monitor ${RELEASE_TAG}" \
+              --repo "${GITHUB_REPOSITORY}"
+          fi
