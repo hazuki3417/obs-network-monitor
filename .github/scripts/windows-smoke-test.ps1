@@ -84,7 +84,7 @@ function Test-RunningMonitor {
     New-Item -ItemType Directory -Path $scenarioDirectory | Out-Null
     $scenarioExecutable = Join-Path $scenarioDirectory "obs-network-monitor.exe"
     Copy-Item $resolvedExecutable $scenarioExecutable
-    if ($null -ne $ConfigContent) {
+    if (-not [string]::IsNullOrEmpty($ConfigContent)) {
         Set-Content -Path (Join-Path $scenarioDirectory "config.json") -Value $ConfigContent -Encoding utf8
     }
 
