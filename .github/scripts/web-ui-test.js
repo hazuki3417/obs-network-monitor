@@ -32,7 +32,14 @@ assert.equal(new Set(ids).size, ids.length, 'HTML element IDs must be unique');
 assert.doesNotMatch(html, /id="nic-name"/, 'legacy NIC dashboard must not remain');
 assert.doesNotMatch(html, /OBS NETWORK MONITOR/, 'legacy product heading must not remain');
 assert.doesNotMatch(html, /成功した測定を待っています|通信量を測定しています/, 'charts must not contain waiting text');
+assert.match(
+  html,
+  /<span class="label">LATENCY<\/span>\s*<strong id="latency">--<\/strong>\s*<span class="unit">ms<\/span>/,
+  'label, value, and unit must be independent grid items',
+);
+assert.match(html, /id="consecutive-failures">0<\/strong>\s*<span class="unit" aria-hidden="true"><\/span>/);
 assert.match(css, /width: min\(464px, calc\(100vw - 16px\)\)/, 'overlay must fit a 480 px source');
+assert.match(css, /grid-template-columns: minmax\(0, 1fr\) 58px 20px/, 'metric columns must have fixed value and unit widths');
 assert.match(css, /data-sections="latency"/, 'latency-only styles must exist');
 assert.match(css, /data-sections="traffic"/, 'traffic-only styles must exist');
 assert.match(css, /data-parts="values"/, 'values-only styles must exist');
