@@ -85,19 +85,12 @@ body[data-sections="traffic"] .panel {
 .metric,
 .latency-summary > div {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 58px 20px;
   align-items: baseline;
-  gap: 8px;
+  column-gap: 4px;
   min-width: 0;
   min-height: 23px;
   padding: 2px 0;
-}
-
-.metric > div {
-  display: flex;
-  align-items: baseline;
-  justify-content: flex-end;
-  gap: 4px;
 }
 
 .metric strong,
@@ -122,8 +115,8 @@ body[data-sections="traffic"] .panel {
   white-space: nowrap;
 }
 
-.unit,
-.latency-summary small {
+.unit {
+  text-align: left;
   color: var(--muted);
   font-size: 9px;
   font-weight: 650;
@@ -241,17 +234,19 @@ body[data-sections="traffic"] .panel {
   font-size: 8px;
 }
 
-#chart-empty,
-#traffic-chart-empty {
-  fill: var(--muted);
-  font-size: 11px;
-}
-
 body[data-sections="latency"] .traffic-title,
 body[data-sections="latency"] .traffic-card,
 body[data-sections="traffic"] .latency-title,
 body[data-sections="traffic"] .metrics,
 body[data-sections="traffic"] .latency-summary,
 body[data-sections="traffic"] .latency-chart-card {
+  display: none;
+}
+
+body[data-parts="values"] .latency-chart-card,
+body[data-parts="values"] .traffic-chart,
+body[data-parts="graph"] .metrics,
+body[data-parts="graph"] .latency-summary,
+body[data-parts="graph"] .traffic-current {
   display: none;
 }

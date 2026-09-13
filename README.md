@@ -89,6 +89,16 @@ OBS向け表示は背景、パネル、NIC情報を表示せず、遅延とNIC�
 | 遅延のみ | `http://127.0.0.1:8080/?sections=latency` | 480 x 270 |
 | NIC通信量のみ | `http://127.0.0.1:8080/?sections=traffic` | 480 x 210 |
 
+各セクションの数値とグラフは、同じBrowser SourceとWebSocket接続のまま `parts` で切り替えられます。
+
+| 表示内容 | クエリ例 |
+| --- | --- |
+| 数値とグラフ | `?parts=values,graph`（既定） |
+| 数値のみ | `?parts=values` |
+| グラフのみ | `?parts=graph` |
+
+`sections` と `parts` は併用できます。たとえばNIC通信量のグラフだけを表示する場合は `http://127.0.0.1:8080/?sections=traffic&parts=graph` を使用します。未指定または有効な値がない場合は、空画面を避けるため数値とグラフの両方を表示します。
+
 このUIはOBSでの利用を前提とし、通常のブラウザで開いた場合も同じ透明なオーバーレイを表示します。WebSocketが切断された場合は最後の値を残し、2秒ごとに再接続します。
 
 ## 測定の動作

@@ -26,13 +26,25 @@ class FakeElement {
 
 const html = fs.readFileSync('web/index.html', 'utf8');
 const css = fs.readFileSync('web/style.css', 'utf8');
+const app = fs.readFileSync('web/app.js', 'utf8');
 const ids = [...html.matchAll(/id="([^"]+)"/g)].map((match) => match[1]);
 assert.equal(new Set(ids).size, ids.length, 'HTML element IDs must be unique');
 assert.doesNotMatch(html, /id="nic-name"/, 'legacy NIC dashboard must not remain');
 assert.doesNotMatch(html, /OBS NETWORK MONITOR/, 'legacy product heading must not remain');
+assert.doesNotMatch(html, /成功した測定を待っています|通信量を測定しています/, 'charts must not contain waiting text');
+assert.match(
+  html,
+  /<span class="label">LATENCY<\/span>\s*<strong id="latency">--<\/strong>\s*<span class="unit">ms<\/span>/,
+  'label, value, and unit must be independent grid items',
+);
+assert.match(html, /id="consecutive-failures">0<\/strong>\s*<span class="unit" aria-hidden="true"><\/span>/);
 assert.match(css, /width: min\(464px, calc\(100vw - 16px\)\)/, 'overlay must fit a 480 px source');
+assert.match(css, /grid-template-columns: minmax\(0, 1fr\) 58px 20px/, 'metric columns must have fixed value and unit widths');
 assert.match(css, /data-sections="latency"/, 'latency-only styles must exist');
 assert.match(css, /data-sections="traffic"/, 'traffic-only styles must exist');
+assert.match(css, /data-parts="values"/, 'values-only styles must exist');
+assert.match(css, /data-parts="graph"/, 'graph-only styles must exist');
+assert.equal((app.match(/new WebSocket/g) || []).length, 1, 'UI parts must share one WebSocket');
 
 function loadUI(search = '') {
   const elements = new Map(ids.map((id) => [id, new FakeElement()]));
@@ -55,7 +67,7 @@ function loadUI(search = '') {
     WebSocket: class {},
     window: {clearTimeout() {}, setTimeout() {}},
   };
-  vm.runInNewContext(fs.readFileSync('web/app.js', 'utf8'), context);
+  vm.runInNewContext(app, context);
   return {body, context, elements};
 }
 
@@ -117,6 +129,7 @@ assert.equal(elements.get('traffic-axis-maximum').textContent, '2');
 assert.equal(elements.get('traffic-axis-middle').textContent, '1');
 assert.equal(elements.get('traffic-overlay-maximum').textContent, '2 Mbps');
 assert.equal(body.dataset.sections, 'all');
+assert.equal(body.dataset.parts, 'all');
 assert.match(html, /id="latency-chart-svg" viewBox="-36 0 516 112"/);
 assert.match(html, /id="traffic-chart-svg" viewBox="-36 0 516 96"/);
 
@@ -131,5 +144,21 @@ assert.equal(invalidSections.body.dataset.sections, 'all');
 
 const legacyOverlayURL = loadUI('?view=overlay');
 assert.equal(legacyOverlayURL.body.dataset.sections, 'all');
+
+const valuesOnly = loadUI('?parts=values');
+assert.equal(valuesOnly.body.dataset.parts, 'values');
+
+const graphOnly = loadUI('?parts=graph');
+assert.equal(graphOnly.body.dataset.parts, 'graph');
+
+const allParts = loadUI('?parts=values,graph');
+assert.equal(allParts.body.dataset.parts, 'all');
+
+const invalidParts = loadUI('?parts=unknown');
+assert.equal(invalidParts.body.dataset.parts, 'all');
+
+const combinedOptions = loadUI('?sections=traffic&parts=graph');
+assert.equal(combinedOptions.body.dataset.sections, 'traffic');
+assert.equal(combinedOptions.body.dataset.parts, 'graph');
 
 console.log('Web UI tests passed.');
