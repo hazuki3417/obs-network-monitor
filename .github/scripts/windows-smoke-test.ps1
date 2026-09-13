@@ -56,6 +56,12 @@ function Assert-MonitorSnapshot {
     if ($null -eq $Snapshot.statistics) {
         throw "Snapshot does not contain statistics."
     }
+    $statisticProperties = $Snapshot.statistics.PSObject.Properties.Name
+    foreach ($property in @("averageLatencyMs", "minimumLatencyMs", "maximumLatencyMs", "consecutiveFailures")) {
+        if ($statisticProperties -notcontains $property) {
+            throw "Snapshot statistics do not contain $property."
+        }
+    }
     if (@("icmp", "http") -notcontains $Snapshot.statistics.method) {
         throw "Unexpected probe method: $($Snapshot.statistics.method)"
     }
@@ -67,6 +73,16 @@ function Assert-MonitorSnapshot {
     }
     if ($Snapshot.history.Count -gt 60) {
         throw "History contains more than 60 samples."
+    }
+    if ($null -eq $Snapshot.traffic) {
+        throw "Snapshot does not contain current NIC traffic."
+    }
+    $trafficProperties = $Snapshot.traffic.PSObject.Properties.Name
+    if ($trafficProperties -notcontains "transmitBps" -or $trafficProperties -notcontains "receiveBps") {
+        throw "Snapshot traffic does not contain transmitBps and receiveBps."
+    }
+    if ($null -eq $Snapshot.trafficHistory -or $Snapshot.trafficHistory.Count -gt 60) {
+        throw "Traffic history is missing or contains more than 60 samples."
     }
     if ($null -eq $Snapshot.generatedAt) {
         throw "Snapshot does not contain generatedAt."

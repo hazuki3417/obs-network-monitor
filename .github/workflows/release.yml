@@ -1,41 +1,95 @@
 name: Release
 
+run-name: Release ${{ inputs.version || github.ref_name }}
+
 on:
   push:
     tags:
       - "v*.*.*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version (vMAJOR.MINOR.PATCH)
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-${{ inputs.version || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
-  windows-build:
-    name: Test and build Windows release
-    runs-on: windows-latest
-    timeout-minutes: 15
+  prepare:
+    name: Validate release target
+    runs-on: ubuntu-latest
+    outputs:
+      release_sha: ${{ steps.prepare.outputs.release_sha }}
+      release_tag: ${{ steps.prepare.outputs.release_tag }}
+      tag_exists: ${{ steps.prepare.outputs.tag_exists }}
 
     steps:
-      - name: Check out tagged commit
+      - name: Check out release target
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Validate release tag and main ancestry
-        shell: pwsh
+      - name: Validate tag and main ancestry
+        id: prepare
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        shell: bash
         run: |
-          if ($env:GITHUB_REF_NAME -notmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') {
-            throw "Release tag must use vMAJOR.MINOR.PATCH format: $env:GITHUB_REF_NAME"
-          }
+          set -euo pipefail
 
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+            if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+              echo "Manual Release must be run with the main branch selected." >&2
+              exit 1
+            fi
+            release_tag="${INPUT_VERSION}"
+          else
+            release_tag="${GITHUB_REF_NAME}"
+          fi
+
+          if [[ ! "${release_tag}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must use vMAJOR.MINOR.PATCH format: ${release_tag}" >&2
+            exit 1
+          fi
+
+          release_sha=$(git rev-parse HEAD)
           git fetch origin main --no-tags
-          git merge-base --is-ancestor $env:GITHUB_SHA origin/main
-          if ($LASTEXITCODE -ne 0) {
-            throw "Tagged commit is not contained in the main branch."
-          }
+          if ! git merge-base --is-ancestor "${release_sha}" origin/main; then
+            echo "Release commit is not contained in the main branch." >&2
+            exit 1
+          fi
+
+          tag_exists=false
+          if git show-ref --verify --quiet "refs/tags/${release_tag}"; then
+            tag_exists=true
+          fi
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" && "${tag_exists}" == "true" ]]; then
+            echo "Tag already exists: ${release_tag}" >&2
+            exit 1
+          fi
+
+          echo "release_sha=${release_sha}" >>"${GITHUB_OUTPUT}"
+          echo "release_tag=${release_tag}" >>"${GITHUB_OUTPUT}"
+          echo "tag_exists=${tag_exists}" >>"${GITHUB_OUTPUT}"
+
+  windows-build:
+    name: Test and build Windows release
+    needs: prepare
+    runs-on: windows-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out release commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.release_sha }}
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -45,6 +99,9 @@ jobs:
 
       - name: Run tests
         run: go test ./...
+
+      - name: Test embedded Web UI
+        run: node .github/scripts/web-ui-test.js
 
       - name: Build Windows executable
         shell: pwsh
@@ -90,7 +147,9 @@ jobs:
 
   publish:
     name: Publish GitHub Release
-    needs: windows-build
+    needs:
+      - prepare
+      - windows-build
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -105,19 +164,35 @@ jobs:
       - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_SHA: ${{ needs.prepare.outputs.release_sha }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+          TAG_EXISTS: ${{ needs.prepare.outputs.tag_exists }}
         run: |
           set -euo pipefail
           archive="dist/obs-network-monitor-windows-x64.zip"
           checksum="${archive}.sha256"
 
           if gh release view "${RELEASE_TAG}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            if [[ "${TAG_EXISTS}" != "true" ]]; then
+              echo "A release or tag was created while this workflow was running. Refusing to overwrite it." >&2
+              exit 1
+            fi
             gh release upload "${RELEASE_TAG}" "${archive}" "${checksum}" \
               --clobber \
               --repo "${GITHUB_REPOSITORY}"
-          else
+          elif [[ "${TAG_EXISTS}" == "true" ]]; then
             gh release create "${RELEASE_TAG}" "${archive}" "${checksum}" \
               --verify-tag \
+              --generate-notes \
+              --title "OBS Network Monitor ${RELEASE_TAG}" \
+              --repo "${GITHUB_REPOSITORY}"
+          else
+            if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${RELEASE_TAG}" >/dev/null 2>&1; then
+              echo "Tag was created while this workflow was running. Refusing to reuse it." >&2
+              exit 1
+            fi
+            gh release create "${RELEASE_TAG}" "${archive}" "${checksum}" \
+              --target "${RELEASE_SHA}" \
               --generate-notes \
               --title "OBS Network Monitor ${RELEASE_TAG}" \
               --repo "${GITHUB_REPOSITORY}"
