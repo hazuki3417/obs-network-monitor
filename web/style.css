@@ -16,6 +16,12 @@
   box-sizing: border-box;
 }
 
+.overlay-only,
+.overlay-section-title,
+.overlay-axis {
+  display: none;
+}
+
 html,
 body {
   width: 100%;
@@ -392,4 +398,226 @@ h1 {
   .latency-summary {
     grid-template-columns: 1fr 1fr;
   }
+}
+
+body[data-view="overlay"] {
+  display: block;
+  width: 100%;
+  min-height: 100%;
+  padding: 8px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .9);
+}
+
+body[data-view="overlay"] .panel {
+  display: grid;
+  grid-template-areas:
+    "latency-title latency-title"
+    "latency-current latency-summary"
+    "latency-chart latency-chart"
+    "traffic-title traffic-title"
+    "traffic traffic";
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 0 28px;
+  width: min(464px, calc(100vw - 16px));
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  overflow: visible;
+}
+
+body[data-view="overlay"][data-sections="latency"] .panel {
+  grid-template-areas:
+    "latency-title latency-title"
+    "latency-current latency-summary"
+    "latency-chart latency-chart";
+}
+
+body[data-view="overlay"][data-sections="traffic"] .panel {
+  grid-template-areas:
+    "traffic-title traffic-title"
+    "traffic traffic";
+}
+
+body[data-view="overlay"] .header,
+body[data-view="overlay"] .nic-card,
+body[data-view="overlay"] .probe-row,
+body[data-view="overlay"] .footer,
+body[data-view="overlay"] .section-heading,
+body[data-view="overlay"] .chart-footer {
+  display: none;
+}
+
+body[data-view="overlay"] .overlay-section-title {
+  display: block;
+  margin: 0 0 8px;
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: 1;
+}
+
+body[data-view="overlay"] .latency-title {
+  grid-area: latency-title;
+}
+
+body[data-view="overlay"] .traffic-title {
+  grid-area: traffic-title;
+  margin-top: 18px;
+}
+
+body[data-view="overlay"] .metrics {
+  grid-area: latency-current;
+  grid-template-columns: 1fr;
+  gap: 2px;
+  margin: 0;
+}
+
+body[data-view="overlay"] .overlay-only {
+  display: grid;
+}
+
+body[data-view="overlay"] .metric,
+body[data-view="overlay"] .latency-summary > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 23px;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+body[data-view="overlay"] .metric > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 4px;
+  margin: 0;
+}
+
+body[data-view="overlay"] .metric strong,
+body[data-view="overlay"] .latency-summary strong {
+  display: block;
+  margin: 0;
+  overflow: visible;
+  color: var(--text);
+  font-size: 19px;
+  font-weight: 680;
+  letter-spacing: -.02em;
+  line-height: 1;
+  text-align: right;
+  text-overflow: clip;
+}
+
+body[data-view="overlay"] .label {
+  align-self: center;
+  color: var(--muted);
+  font-size: 10px;
+  letter-spacing: .08em;
+  white-space: nowrap;
+}
+
+body[data-view="overlay"] .unit,
+body[data-view="overlay"] .latency-summary small {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+body[data-view="overlay"] .latency-summary {
+  grid-area: latency-summary;
+  grid-template-columns: 1fr;
+  gap: 2px;
+  margin: 0;
+}
+
+body[data-view="overlay"] .summary-failures {
+  display: none;
+}
+
+body[data-view="overlay"] .latency-chart-card {
+  grid-area: latency-chart;
+  margin-top: 8px;
+}
+
+body[data-view="overlay"] .chart-card {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+body[data-view="overlay"] .chart {
+  width: 100%;
+  height: 104px;
+  margin: 0;
+}
+
+body[data-view="overlay"] .traffic-card {
+  grid-area: traffic;
+  margin: 0;
+}
+
+body[data-view="overlay"] .traffic-current {
+  gap: 28px;
+  margin: 0 0 6px;
+}
+
+body[data-view="overlay"] .traffic-current > div {
+  grid-template-columns: 3px minmax(0, 1fr) auto;
+  column-gap: 7px;
+}
+
+body[data-view="overlay"] .traffic-current strong {
+  grid-column: 3;
+  grid-row: 1;
+  margin: 0;
+  color: var(--text);
+  font-size: 19px;
+  line-height: 1;
+  text-align: right;
+  white-space: nowrap;
+}
+
+body[data-view="overlay"] .traffic-key {
+  grid-column: 1;
+  grid-row: 1;
+  height: 22px;
+}
+
+body[data-view="overlay"] .traffic-chart {
+  height: 96px;
+}
+
+body[data-view="overlay"] .overlay-axis {
+  display: inline;
+}
+
+body[data-view="overlay"] .axis-label,
+body[data-view="overlay"] .axis-maximum {
+  fill: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+body[data-view="overlay"] .axis-maximum {
+  font-size: 8px;
+}
+
+body[data-view="overlay"] #latency-points {
+  display: none;
+}
+
+body[data-view="overlay"][data-sections="latency"] .traffic-title,
+body[data-view="overlay"][data-sections="latency"] .traffic-card,
+body[data-view="overlay"][data-sections="traffic"] .latency-title,
+body[data-view="overlay"][data-sections="traffic"] .metrics,
+body[data-view="overlay"][data-sections="traffic"] .latency-summary,
+body[data-view="overlay"][data-sections="traffic"] .latency-chart-card {
+  display: none;
 }
