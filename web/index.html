@@ -29,11 +29,11 @@
       <div class="link-speeds">
         <div>
           <span class="label">UPLOAD LINK</span>
-          <strong id="tx-speed">--</strong>
+          <strong id="tx-link-speed">--</strong>
         </div>
         <div>
           <span class="label">DOWNLOAD LINK</span>
-          <strong id="rx-speed">--</strong>
+          <strong id="rx-link-speed">--</strong>
         </div>
       </div>
     </section>
@@ -50,6 +50,57 @@
       <div class="metric">
         <span class="label" id="failure-label">PACKET LOSS</span>
         <div><strong id="failure-rate">--</strong><span class="unit">%</span></div>
+      </div>
+    </section>
+
+    <section class="latency-summary" aria-label="直近60回の遅延統計">
+      <div>
+        <span class="label">AVG LATENCY</span>
+        <strong><span id="average-latency">--</span> <small>ms</small></strong>
+      </div>
+      <div>
+        <span class="label">MIN LATENCY</span>
+        <strong><span id="minimum-latency">--</span> <small>ms</small></strong>
+      </div>
+      <div>
+        <span class="label">MAX LATENCY</span>
+        <strong><span id="maximum-latency">--</span> <small>ms</small></strong>
+      </div>
+      <div>
+        <span class="label">FAIL STREAK</span>
+        <strong id="consecutive-failures">0</strong>
+      </div>
+    </section>
+
+    <section class="chart-card traffic-card" aria-labelledby="traffic-heading">
+      <div class="section-heading">
+        <span id="traffic-heading">NIC TRAFFIC · LAST 60 SAMPLES</span>
+        <span id="traffic-chart-max">--</span>
+      </div>
+      <div class="traffic-current">
+        <div>
+          <span class="traffic-key transmit" aria-hidden="true"></span>
+          <span class="label">UPLOAD</span>
+          <strong id="tx-traffic">--</strong>
+        </div>
+        <div>
+          <span class="traffic-key receive" aria-hidden="true"></span>
+          <span class="label">DOWNLOAD</span>
+          <strong id="rx-traffic">--</strong>
+        </div>
+      </div>
+      <svg class="chart traffic-chart" viewBox="0 0 480 96" role="img" aria-label="直近60回のNIC送受信速度グラフ">
+        <line class="grid-line" x1="0" y1="1" x2="480" y2="1"></line>
+        <line class="grid-line" x1="0" y1="48" x2="480" y2="48"></line>
+        <line class="grid-line" x1="0" y1="95" x2="480" y2="95"></line>
+        <path id="traffic-transmit-path" class="traffic-path transmit" d=""></path>
+        <path id="traffic-receive-path" class="traffic-path receive" d=""></path>
+        <text id="traffic-chart-empty" x="240" y="53" text-anchor="middle">通信量を測定しています</text>
+      </svg>
+      <div class="chart-footer">
+        <span>60 samples ago</span>
+        <span id="traffic-sample-count">0 / 60</span>
+        <span>now</span>
       </div>
     </section>
 

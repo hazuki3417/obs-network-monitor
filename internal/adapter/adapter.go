@@ -32,6 +32,8 @@ type Info struct {
 	State                State  `json:"state"`
 	TransmitLinkSpeedBPS uint64 `json:"transmitLinkSpeedBps"`
 	ReceiveLinkSpeedBPS  uint64 `json:"receiveLinkSpeedBps"`
+	TransmitOctets       uint64 `json:"-"`
+	ReceiveOctets        uint64 `json:"-"`
 }
 
 type Provider interface {
@@ -56,6 +58,8 @@ type rawInfo struct {
 	MediaConnectState    uint32
 	TransmitLinkSpeedBPS uint64
 	ReceiveLinkSpeedBPS  uint64
+	TransmitOctets       uint64
+	ReceiveOctets        uint64
 }
 
 type Inspector struct {
@@ -104,6 +108,8 @@ func (inspector *Inspector) Inspect(ctx context.Context, target string) (Info, e
 		State:                connectionState(row.OperStatus, row.MediaConnectState),
 		TransmitLinkSpeedBPS: row.TransmitLinkSpeedBPS,
 		ReceiveLinkSpeedBPS:  row.ReceiveLinkSpeedBPS,
+		TransmitOctets:       row.TransmitOctets,
+		ReceiveOctets:        row.ReceiveOctets,
 	}, nil
 }
 
