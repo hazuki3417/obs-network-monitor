@@ -241,17 +241,19 @@ body[data-sections="traffic"] .panel {
   font-size: 8px;
 }
 
-#chart-empty,
-#traffic-chart-empty {
-  fill: var(--muted);
-  font-size: 11px;
-}
-
 body[data-sections="latency"] .traffic-title,
 body[data-sections="latency"] .traffic-card,
 body[data-sections="traffic"] .latency-title,
 body[data-sections="traffic"] .metrics,
 body[data-sections="traffic"] .latency-summary,
 body[data-sections="traffic"] .latency-chart-card {
+  display: none;
+}
+
+body[data-parts="values"] .latency-chart-card,
+body[data-parts="values"] .traffic-chart,
+body[data-parts="graph"] .metrics,
+body[data-parts="graph"] .latency-summary,
+body[data-parts="graph"] .traffic-current {
   display: none;
 }

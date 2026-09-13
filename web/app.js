@@ -10,10 +10,8 @@ const elements = {
   failureRate: document.querySelector('#failure-rate'),
   consecutiveFailures: document.querySelector('#consecutive-failures'),
   chartPath: document.querySelector('#latency-path'),
-  chartEmpty: document.querySelector('#chart-empty'),
   trafficTransmitPath: document.querySelector('#traffic-transmit-path'),
   trafficReceivePath: document.querySelector('#traffic-receive-path'),
-  trafficChartEmpty: document.querySelector('#traffic-chart-empty'),
   trafficAxisMaximum: document.querySelector('#traffic-axis-maximum'),
   trafficAxisMiddle: document.querySelector('#traffic-axis-middle'),
   trafficOverlayMaximum: document.querySelector('#traffic-overlay-maximum'),
@@ -34,9 +32,16 @@ function applyViewOptions() {
     .map((section) => section.trim().toLowerCase())
     .filter((section) => section === 'latency' || section === 'traffic');
   const sections = new Set(requestedSections);
-  const selection = sections.size === 1 ? [...sections][0] : 'all';
+  const sectionSelection = sections.size === 1 ? [...sections][0] : 'all';
+  const requestedParts = (query.get('parts') || '')
+    .split(',')
+    .map((part) => part.trim().toLowerCase())
+    .filter((part) => part === 'values' || part === 'graph');
+  const parts = new Set(requestedParts);
+  const partSelection = parts.size === 1 ? [...parts][0] : 'all';
 
-  document.body.dataset.sections = selection;
+  document.body.dataset.sections = sectionSelection;
+  document.body.dataset.parts = partSelection;
 }
 
 function formatSpeed(bitsPerSecond) {
@@ -163,7 +168,6 @@ function renderTrafficChart(rawHistory) {
   elements.trafficAxisMaximum.textContent = values.length ? scale.maximum : '--';
   elements.trafficAxisMiddle.textContent = values.length ? scale.middle : '--';
   elements.trafficOverlayMaximum.textContent = values.length ? scale.label : '--';
-  elements.trafficChartEmpty.hidden = values.length > 0;
 }
 
 function renderChart(rawHistory) {
@@ -182,7 +186,6 @@ function renderChart(rawHistory) {
   elements.latencyAxisMaximum.textContent = successes.length ? compactNumber(maximum) : '--';
   elements.latencyAxisMiddle.textContent = successes.length ? compactNumber(maximum / 2) : '--';
   elements.latencyOverlayMaximum.textContent = successes.length ? `${maximum} ms` : '-- ms';
-  elements.chartEmpty.hidden = successes.length > 0;
 }
 
 function renderSnapshot(snapshot) {

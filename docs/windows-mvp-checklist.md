@@ -94,6 +94,15 @@ ICMPを返さない検証用ネットワークまたは測定先を使い、HTTP
 - [ ] `sections=latency` では遅延セクションだけが表示された
 - [ ] `sections=traffic` ではNIC通信量セクションだけが表示された
 
+6. URLへ `?parts=values`、`?parts=graph`、`?parts=values,graph` を順に指定する。
+7. `?sections=traffic&parts=graph` のように `sections` と併用する。
+
+- [ ] `parts=values` では数値だけが表示された
+- [ ] `parts=graph` ではグラフだけが表示された
+- [ ] `parts=values,graph` と未指定では両方が表示された
+- [ ] `sections` と `parts` の指定が同時に反映された
+- [ ] データ未取得時もグラフ中央に待機テキストが表示されなかった
+
 ## 結果記録
 
 | 項目 | 結果 | 備考 |
