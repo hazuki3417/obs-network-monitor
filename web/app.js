@@ -1,11 +1,4 @@
 const elements = {
-  streamState: document.querySelector('#stream-state'),
-  streamLabel: document.querySelector('#stream-label'),
-  nicName: document.querySelector('#nic-name'),
-  nicDescription: document.querySelector('#nic-description'),
-  nicState: document.querySelector('#nic-state'),
-  txLinkSpeed: document.querySelector('#tx-link-speed'),
-  rxLinkSpeed: document.querySelector('#rx-link-speed'),
   txTraffic: document.querySelector('#tx-traffic'),
   rxTraffic: document.querySelector('#rx-traffic'),
   latency: document.querySelector('#latency'),
@@ -16,20 +9,17 @@ const elements = {
   failureLabel: document.querySelector('#failure-label'),
   failureRate: document.querySelector('#failure-rate'),
   consecutiveFailures: document.querySelector('#consecutive-failures'),
-  probeMethod: document.querySelector('#probe-method'),
-  probeTarget: document.querySelector('#probe-target'),
-  chartMax: document.querySelector('#chart-max'),
   chartPath: document.querySelector('#latency-path'),
-  chartPoints: document.querySelector('#latency-points'),
   chartEmpty: document.querySelector('#chart-empty'),
-  sampleCount: document.querySelector('#sample-count'),
-  trafficChartMax: document.querySelector('#traffic-chart-max'),
   trafficTransmitPath: document.querySelector('#traffic-transmit-path'),
   trafficReceivePath: document.querySelector('#traffic-receive-path'),
   trafficChartEmpty: document.querySelector('#traffic-chart-empty'),
-  trafficSampleCount: document.querySelector('#traffic-sample-count'),
-  updateNote: document.querySelector('#update-note'),
-  updated: document.querySelector('#updated'),
+  trafficAxisMaximum: document.querySelector('#traffic-axis-maximum'),
+  trafficAxisMiddle: document.querySelector('#traffic-axis-middle'),
+  trafficOverlayMaximum: document.querySelector('#traffic-overlay-maximum'),
+  latencyAxisMaximum: document.querySelector('#latency-axis-maximum'),
+  latencyAxisMiddle: document.querySelector('#latency-axis-middle'),
+  latencyOverlayMaximum: document.querySelector('#latency-overlay-maximum'),
 };
 
 const chart = {width: 480, height: 112, capacity: 60};
@@ -37,9 +27,16 @@ const trafficChart = {width: 480, height: 96, capacity: 60};
 const reconnectDelayMS = 2000;
 let reconnectTimer;
 
-function setStreamState(state, label) {
-  elements.streamState.dataset.state = state;
-  elements.streamLabel.textContent = label;
+function applyViewOptions() {
+  const query = new URLSearchParams(location.search);
+  const requestedSections = (query.get('sections') || '')
+    .split(',')
+    .map((section) => section.trim().toLowerCase())
+    .filter((section) => section === 'latency' || section === 'traffic');
+  const sections = new Set(requestedSections);
+  const selection = sections.size === 1 ? [...sections][0] : 'all';
+
+  document.body.dataset.sections = selection;
 }
 
 function formatSpeed(bitsPerSecond) {
@@ -55,20 +52,8 @@ function formatSpeed(bitsPerSecond) {
   return `${value.toFixed(digits)} ${units[unit]}`;
 }
 
-function formatLinkSpeed(bitsPerSecond) {
-  return bitsPerSecond > 0 ? formatSpeed(bitsPerSecond) : '--';
-}
-
 function formatValue(value, digits = 0) {
   return Number.isFinite(value) ? value.toFixed(digits) : '--';
-}
-
-function nicStateLabel(state) {
-  return {
-    connected: '接続済み',
-    disconnected: '未接続',
-    unknown: '状態不明',
-  }[state] || '状態不明';
 }
 
 function niceMaximum(value, minimum = 10) {
@@ -80,22 +65,90 @@ function niceMaximum(value, minimum = 10) {
   return Math.max(minimum, step * magnitude);
 }
 
-function trafficPath(history, key, maximum) {
-  const firstSlot = trafficChart.capacity - history.length;
-  let path = '';
-  let drawing = false;
+function compactNumber(value) {
+  if (!Number.isFinite(value)) return '--';
+  if (Number.isInteger(value)) return value.toFixed(0);
+  return value.toFixed(1).replace(/\.0$/, '');
+}
+
+function speedScale(bitsPerSecond) {
+  const units = ['bps', 'Kbps', 'Mbps', 'Gbps', 'Tbps'];
+  let value = bitsPerSecond;
+  let unit = 0;
+  while (value >= 1000 && unit < units.length - 1) {
+    value /= 1000;
+    unit += 1;
+  }
+  return {
+    maximum: compactNumber(value),
+    middle: compactNumber(value / 2),
+    label: `${compactNumber(value)} ${units[unit]}`,
+  };
+}
+
+function monotonePath(points) {
+  if (points.length === 0) return '';
+  if (points.length === 1) {
+    return `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
+  }
+
+  const slopes = points.slice(0, -1).map((point, index) => {
+    const next = points[index + 1];
+    return (next.y - point.y) / (next.x - point.x);
+  });
+  const tangents = new Array(points.length);
+  tangents[0] = slopes[0];
+  tangents[tangents.length - 1] = slopes[slopes.length - 1];
+
+  for (let index = 1; index < tangents.length - 1; index += 1) {
+    const previous = slopes[index - 1];
+    const next = slopes[index];
+    tangents[index] = previous * next <= 0
+      ? 0
+      : (2 * previous * next) / (previous + next);
+  }
+
+  let path = `M ${points[0].x.toFixed(2)} ${points[0].y.toFixed(2)}`;
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const point = points[index];
+    const next = points[index + 1];
+    const width = next.x - point.x;
+    const firstControlX = point.x + width / 3;
+    const firstControlY = point.y + (tangents[index] * width) / 3;
+    const secondControlX = next.x - width / 3;
+    const secondControlY = next.y - (tangents[index + 1] * width) / 3;
+    path += ` C ${firstControlX.toFixed(2)} ${firstControlY.toFixed(2)}`
+      + ` ${secondControlX.toFixed(2)} ${secondControlY.toFixed(2)}`
+      + ` ${next.x.toFixed(2)} ${next.y.toFixed(2)}`;
+  }
+  return path;
+}
+
+function segmentedSmoothPath(history, pointForEntry) {
+  const segments = [];
+  let segment = [];
   history.forEach((entry, index) => {
-    const value = entry[key];
-    if (!Number.isFinite(value)) {
-      drawing = false;
+    const point = pointForEntry(entry, index);
+    if (point) {
+      segment.push(point);
       return;
     }
+    if (segment.length) segments.push(segment);
+    segment = [];
+  });
+  if (segment.length) segments.push(segment);
+  return segments.map(monotonePath).join(' ');
+}
+
+function trafficPath(history, key, maximum) {
+  const firstSlot = trafficChart.capacity - history.length;
+  return segmentedSmoothPath(history, (entry, index) => {
+    const value = entry[key];
+    if (!Number.isFinite(value)) return null;
     const x = ((firstSlot + index) / (trafficChart.capacity - 1)) * trafficChart.width;
     const y = trafficChart.height - (Math.max(0, value) / maximum) * trafficChart.height;
-    path += `${drawing ? ' L' : ' M'} ${x.toFixed(2)} ${y.toFixed(2)}`;
-    drawing = true;
+    return {x, y};
   });
-  return path.trim();
 }
 
 function renderTrafficChart(rawHistory) {
@@ -106,9 +159,11 @@ function renderTrafficChart(rawHistory) {
 
   elements.trafficTransmitPath.setAttribute('d', trafficPath(history, 'transmitBps', maximum));
   elements.trafficReceivePath.setAttribute('d', trafficPath(history, 'receiveBps', maximum));
-  elements.trafficChartMax.textContent = values.length ? formatSpeed(maximum) : '--';
+  const scale = speedScale(maximum);
+  elements.trafficAxisMaximum.textContent = values.length ? scale.maximum : '--';
+  elements.trafficAxisMiddle.textContent = values.length ? scale.middle : '--';
+  elements.trafficOverlayMaximum.textContent = values.length ? scale.label : '--';
   elements.trafficChartEmpty.hidden = values.length > 0;
-  elements.trafficSampleCount.textContent = `${history.length} / ${trafficChart.capacity}`;
 }
 
 function renderChart(rawHistory) {
@@ -116,45 +171,26 @@ function renderChart(rawHistory) {
   const successes = history.filter((entry) => entry.success && Number.isFinite(entry.rttMs));
   const maximum = niceMaximum(Math.max(0, ...successes.map((entry) => entry.rttMs)));
   const firstSlot = chart.capacity - history.length;
-  let path = '';
-  let drawing = false;
-
-  elements.chartPoints.replaceChildren();
-  history.forEach((entry, index) => {
-    if (!entry.success || !Number.isFinite(entry.rttMs)) {
-      drawing = false;
-      return;
-    }
+  const path = segmentedSmoothPath(history, (entry, index) => {
+    if (!entry.success || !Number.isFinite(entry.rttMs)) return null;
     const x = ((firstSlot + index) / (chart.capacity - 1)) * chart.width;
     const y = chart.height - (Math.max(0, entry.rttMs) / maximum) * chart.height;
-    path += `${drawing ? ' L' : ' M'} ${x.toFixed(2)} ${y.toFixed(2)}`;
-    drawing = true;
-
-    const point = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    point.setAttribute('cx', x.toFixed(2));
-    point.setAttribute('cy', y.toFixed(2));
-    point.setAttribute('r', index === history.length - 1 ? '2.5' : '1.4');
-    elements.chartPoints.append(point);
+    return {x, y};
   });
 
-  elements.chartPath.setAttribute('d', path.trim());
-  elements.chartMax.textContent = successes.length ? `${maximum} ms` : '-- ms';
+  elements.chartPath.setAttribute('d', path);
+  elements.latencyAxisMaximum.textContent = successes.length ? compactNumber(maximum) : '--';
+  elements.latencyAxisMiddle.textContent = successes.length ? compactNumber(maximum / 2) : '--';
+  elements.latencyOverlayMaximum.textContent = successes.length ? `${maximum} ms` : '-- ms';
   elements.chartEmpty.hidden = successes.length > 0;
-  elements.sampleCount.textContent = `${history.length} / ${chart.capacity}`;
 }
 
 function renderSnapshot(snapshot) {
-  const nic = snapshot.nic || {};
   const traffic = snapshot.traffic || {};
   const statistics = snapshot.statistics || {};
   const history = Array.isArray(snapshot.history) ? snapshot.history : [];
   const trafficHistory = Array.isArray(snapshot.trafficHistory) ? snapshot.trafficHistory : [];
 
-  elements.nicName.textContent = nic.name || '--';
-  elements.nicDescription.textContent = nic.description || 'アダプター情報なし';
-  elements.nicState.textContent = nicStateLabel(nic.state);
-  elements.txLinkSpeed.textContent = formatLinkSpeed(nic.transmitLinkSpeedBps);
-  elements.rxLinkSpeed.textContent = formatLinkSpeed(nic.receiveLinkSpeedBps);
   elements.txTraffic.textContent = formatSpeed(traffic.transmitBps);
   elements.rxTraffic.textContent = formatSpeed(traffic.receiveBps);
   elements.latency.textContent = formatValue(statistics.latestLatencyMs);
@@ -169,17 +205,8 @@ function renderSnapshot(snapshot) {
   elements.consecutiveFailures.textContent = Number.isInteger(statistics.consecutiveFailures)
     ? statistics.consecutiveFailures
     : '--';
-  elements.probeMethod.textContent = statistics.method ? statistics.method.toUpperCase() : '--';
-  elements.probeTarget.textContent = statistics.target || '測定先なし';
   renderChart(history);
   renderTrafficChart(trafficHistory);
-
-  const generatedAt = new Date(snapshot.generatedAt);
-  elements.updated.textContent = Number.isNaN(generatedAt.getTime())
-    ? '--:--:--'
-    : generatedAt.toLocaleTimeString('ja-JP', {hour12: false});
-  elements.updateNote.textContent = '最終更新';
-  setStreamState('live', '受信中');
 }
 
 function scheduleReconnect() {
@@ -188,29 +215,22 @@ function scheduleReconnect() {
 }
 
 function connect() {
-  setStreamState('connecting', '接続中');
   const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
   const socket = new WebSocket(`${protocol}://${location.host}/ws`);
-
-  socket.onopen = () => {
-    setStreamState('connecting', 'データ待機');
-  };
 
   socket.onmessage = ({data}) => {
     try {
       renderSnapshot(JSON.parse(data));
     } catch (error) {
       console.error('Invalid monitor snapshot', error);
-      elements.updateNote.textContent = 'データ形式エラー';
     }
   };
 
   socket.onerror = () => socket.close();
   socket.onclose = () => {
-    setStreamState('disconnected', '再接続中');
-    elements.updateNote.textContent = '更新停止 · 最終受信';
     scheduleReconnect();
   };
 }
 
+applyViewOptions();
 connect();
