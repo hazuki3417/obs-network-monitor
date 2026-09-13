@@ -46,6 +46,9 @@ jobs:
       - name: Run tests
         run: go test ./...
 
+      - name: Test embedded Web UI
+        run: node .github/scripts/web-ui-test.js
+
       - name: Build Windows executable
         shell: pwsh
         run: |

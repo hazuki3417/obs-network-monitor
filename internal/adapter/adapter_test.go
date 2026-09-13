@@ -57,6 +57,8 @@ func TestInspectReturnsRouteSelectedAdapter(t *testing.T) {
 				MediaConnectState:    mediaStateConnected,
 				TransmitLinkSpeedBPS: 1_000_000_000,
 				ReceiveLinkSpeedBPS:  1_000_000_000,
+				TransmitOctets:       1_200,
+				ReceiveOctets:        3_400,
 			}, nil
 		},
 	}
@@ -73,6 +75,8 @@ func TestInspectReturnsRouteSelectedAdapter(t *testing.T) {
 		State:                StateConnected,
 		TransmitLinkSpeedBPS: 1_000_000_000,
 		ReceiveLinkSpeedBPS:  1_000_000_000,
+		TransmitOctets:       1_200,
+		ReceiveOctets:        3_400,
 	}
 	if got != want {
 		t.Fatalf("Inspect() = %#v, want %#v", got, want)

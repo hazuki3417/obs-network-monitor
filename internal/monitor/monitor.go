@@ -22,19 +22,35 @@ const (
 )
 
 type Statistics struct {
-	Method             probe.Method  `json:"method"`
-	Target             string        `json:"target"`
-	LatestLatencyMS    *int64        `json:"latestLatencyMs"`
-	JitterMS           *float64      `json:"jitterMs"`
-	FailureMetric      FailureMetric `json:"failureMetric"`
-	FailureRatePercent float64       `json:"failureRatePercent"`
+	Method              probe.Method  `json:"method"`
+	Target              string        `json:"target"`
+	LatestLatencyMS     *int64        `json:"latestLatencyMs"`
+	AverageLatencyMS    *float64      `json:"averageLatencyMs"`
+	MinimumLatencyMS    *int64        `json:"minimumLatencyMs"`
+	MaximumLatencyMS    *int64        `json:"maximumLatencyMs"`
+	JitterMS            *float64      `json:"jitterMs"`
+	FailureMetric       FailureMetric `json:"failureMetric"`
+	FailureRatePercent  float64       `json:"failureRatePercent"`
+	ConsecutiveFailures int          `json:"consecutiveFailures"`
+}
+
+type Traffic struct {
+	TransmitBPS *float64 `json:"transmitBps"`
+	ReceiveBPS  *float64 `json:"receiveBps"`
+}
+
+type TrafficSample struct {
+	Traffic
+	CheckedAt time.Time `json:"checkedAt"`
 }
 
 type Snapshot struct {
-	NIC         adapter.Info   `json:"nic"`
-	Statistics  Statistics     `json:"statistics"`
-	History     []probe.Result `json:"history"`
-	GeneratedAt time.Time      `json:"generatedAt"`
+	NIC            adapter.Info    `json:"nic"`
+	Traffic        Traffic         `json:"traffic"`
+	Statistics     Statistics      `json:"statistics"`
+	History        []probe.Result  `json:"history"`
+	TrafficHistory []TrafficSample `json:"trafficHistory"`
+	GeneratedAt    time.Time       `json:"generatedAt"`
 }
 
 type Logger interface {
@@ -51,6 +67,8 @@ type Monitor struct {
 
 	mu          sync.Mutex
 	history     historyWindow
+	traffic     trafficWindow
+	tracker     trafficTracker
 	latest      Snapshot
 	hasLatest   bool
 	subscribers map[chan Snapshot]struct{}
@@ -83,6 +101,7 @@ func newMonitor(
 		logger:        logger,
 		now:           now,
 		history:       historyWindow{limit: historyLimit},
+		traffic:       trafficWindow{limit: historyLimit},
 		subscribers:   make(map[chan Snapshot]struct{}),
 	}
 }
@@ -153,14 +172,20 @@ func (monitor *Monitor) collect(ctx context.Context) bool {
 		monitor.logger.Printf("measure network: %v", probeErr)
 	}
 
+	generatedAt := monitor.now()
+
 	monitor.mu.Lock()
 	defer monitor.mu.Unlock()
 	monitor.history.Add(result)
+	traffic, resetTraffic := monitor.tracker.Sample(nic, generatedAt, nicErr == nil)
+	monitor.traffic.Add(TrafficSample{Traffic: traffic, CheckedAt: generatedAt}, resetTraffic)
 	monitor.latest = Snapshot{
-		NIC:         nic,
-		Statistics:  monitor.history.Statistics(),
-		History:     monitor.history.Samples(),
-		GeneratedAt: monitor.now(),
+		NIC:            nic,
+		Traffic:        traffic,
+		Statistics:     monitor.history.Statistics(),
+		History:        monitor.history.Samples(),
+		TrafficHistory: monitor.traffic.Samples(),
+		GeneratedAt:    generatedAt,
 	}
 	monitor.hasLatest = true
 	monitor.publishLocked(monitor.latest)
@@ -188,7 +213,69 @@ func (monitor *Monitor) publishLocked(snapshot Snapshot) {
 func cloneSnapshot(snapshot Snapshot) Snapshot {
 	result := snapshot
 	result.History = append([]probe.Result(nil), snapshot.History...)
+	result.TrafficHistory = append([]TrafficSample(nil), snapshot.TrafficHistory...)
 	return result
+}
+
+type trafficTracker struct {
+	valid          bool
+	interfaceIndex uint32
+	interfaceLUID  uint64
+	transmitOctets uint64
+	receiveOctets  uint64
+	checkedAt      time.Time
+}
+
+func (tracker *trafficTracker) Sample(info adapter.Info, checkedAt time.Time, valid bool) (Traffic, bool) {
+	if !valid || info.State != adapter.StateConnected {
+		wasValid := tracker.valid
+		tracker.valid = false
+		return Traffic{}, wasValid
+	}
+
+	sameAdapter := tracker.valid && tracker.interfaceIndex == info.InterfaceIndex && tracker.interfaceLUID == info.InterfaceLUID
+	reset := tracker.valid && !sameAdapter
+	if !sameAdapter || !checkedAt.After(tracker.checkedAt) ||
+		info.TransmitOctets < tracker.transmitOctets || info.ReceiveOctets < tracker.receiveOctets {
+		tracker.setBaseline(info, checkedAt)
+		return Traffic{}, reset
+	}
+
+	seconds := checkedAt.Sub(tracker.checkedAt).Seconds()
+	transmit := float64(info.TransmitOctets-tracker.transmitOctets) * 8 / seconds
+	receive := float64(info.ReceiveOctets-tracker.receiveOctets) * 8 / seconds
+	tracker.setBaseline(info, checkedAt)
+	return Traffic{TransmitBPS: &transmit, ReceiveBPS: &receive}, false
+}
+
+func (tracker *trafficTracker) setBaseline(info adapter.Info, checkedAt time.Time) {
+	tracker.valid = true
+	tracker.interfaceIndex = info.InterfaceIndex
+	tracker.interfaceLUID = info.InterfaceLUID
+	tracker.transmitOctets = info.TransmitOctets
+	tracker.receiveOctets = info.ReceiveOctets
+	tracker.checkedAt = checkedAt
+}
+
+type trafficWindow struct {
+	limit   int
+	samples []TrafficSample
+}
+
+func (window *trafficWindow) Add(sample TrafficSample, reset bool) {
+	if reset {
+		window.samples = window.samples[:0]
+	}
+	if len(window.samples) < window.limit {
+		window.samples = append(window.samples, sample)
+		return
+	}
+	copy(window.samples, window.samples[1:])
+	window.samples[len(window.samples)-1] = sample
+}
+
+func (window *trafficWindow) Samples() []TrafficSample {
+	return append([]TrafficSample(nil), window.samples...)
 }
 
 type historyWindow struct {
@@ -227,6 +314,8 @@ func (window *historyWindow) Statistics() Statistics {
 	}
 
 	failed := 0
+	successful := 0
+	latencyTotal := int64(0)
 	jitterTotal := int64(0)
 	jitterPairs := 0
 	for index, sample := range window.samples {
@@ -235,7 +324,17 @@ func (window *historyWindow) Statistics() Statistics {
 			continue
 		}
 		latency := sample.RTTMillis
+		successful++
+		latencyTotal += latency
 		statistics.LatestLatencyMS = &latency
+		if statistics.MinimumLatencyMS == nil || latency < *statistics.MinimumLatencyMS {
+			minimum := latency
+			statistics.MinimumLatencyMS = &minimum
+		}
+		if statistics.MaximumLatencyMS == nil || latency > *statistics.MaximumLatencyMS {
+			maximum := latency
+			statistics.MaximumLatencyMS = &maximum
+		}
 		if index == 0 || !window.samples[index-1].Success {
 			continue
 		}
@@ -248,6 +347,13 @@ func (window *historyWindow) Statistics() Statistics {
 	}
 
 	statistics.FailureRatePercent = float64(failed) / float64(len(window.samples)) * 100
+	if successful > 0 {
+		average := float64(latencyTotal) / float64(successful)
+		statistics.AverageLatencyMS = &average
+	}
+	for index := len(window.samples) - 1; index >= 0 && !window.samples[index].Success; index-- {
+		statistics.ConsecutiveFailures++
+	}
 	if jitterPairs > 0 {
 		jitter := float64(jitterTotal) / float64(jitterPairs)
 		statistics.JitterMS = &jitter

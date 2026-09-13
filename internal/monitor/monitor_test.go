@@ -51,6 +51,18 @@ func TestStatisticsSkipFailuresBetweenJitterPairs(t *testing.T) {
 	if statistics.JitterMS == nil || *statistics.JitterMS != 5 {
 		t.Fatalf("jitter = %v, want 5", statistics.JitterMS)
 	}
+	if statistics.AverageLatencyMS == nil || *statistics.AverageLatencyMS != 22.5 {
+		t.Fatalf("average latency = %v, want 22.5", statistics.AverageLatencyMS)
+	}
+	if statistics.MinimumLatencyMS == nil || *statistics.MinimumLatencyMS != 10 {
+		t.Fatalf("minimum latency = %v, want 10", statistics.MinimumLatencyMS)
+	}
+	if statistics.MaximumLatencyMS == nil || *statistics.MaximumLatencyMS != 36 {
+		t.Fatalf("maximum latency = %v, want 36", statistics.MaximumLatencyMS)
+	}
+	if statistics.ConsecutiveFailures != 0 {
+		t.Fatalf("consecutive failures = %d, want 0", statistics.ConsecutiveFailures)
+	}
 	if statistics.FailureMetric != FailureMetricPacketLoss || statistics.FailureRatePercent != 20 {
 		t.Fatalf("failure metric = %q, rate = %v", statistics.FailureMetric, statistics.FailureRatePercent)
 	}
@@ -62,11 +74,92 @@ func TestStatisticsHaveNoLatencyOrJitterWithoutSuccess(t *testing.T) {
 	window.Add(sample(probe.MethodICMP, false, 0))
 
 	statistics := window.Statistics()
-	if statistics.LatestLatencyMS != nil || statistics.JitterMS != nil {
-		t.Fatalf("latency = %v, jitter = %v, want nil", statistics.LatestLatencyMS, statistics.JitterMS)
+	if statistics.LatestLatencyMS != nil || statistics.AverageLatencyMS != nil ||
+		statistics.MinimumLatencyMS != nil || statistics.MaximumLatencyMS != nil || statistics.JitterMS != nil {
+		t.Fatalf("statistics = %#v, want nil latency values", statistics)
 	}
 	if statistics.FailureRatePercent != 100 {
 		t.Fatalf("failure rate = %v, want 100", statistics.FailureRatePercent)
+	}
+	if statistics.ConsecutiveFailures != 2 {
+		t.Fatalf("consecutive failures = %d, want 2", statistics.ConsecutiveFailures)
+	}
+}
+
+func TestStatisticsCountOnlyTrailingFailures(t *testing.T) {
+	window := historyWindow{limit: 60}
+	window.Add(sample(probe.MethodICMP, false, 0))
+	window.Add(sample(probe.MethodICMP, true, 20))
+	window.Add(sample(probe.MethodICMP, false, 0))
+	window.Add(sample(probe.MethodICMP, false, 0))
+
+	statistics := window.Statistics()
+	if statistics.ConsecutiveFailures != 2 {
+		t.Fatalf("consecutive failures = %d, want 2", statistics.ConsecutiveFailures)
+	}
+}
+
+func TestTrafficTrackerCalculatesRatesFromCounterDeltas(t *testing.T) {
+	tracker := trafficTracker{}
+	start := time.Date(2026, 9, 13, 3, 0, 0, 0, time.UTC)
+	first := adapter.Info{
+		InterfaceIndex: 4,
+		InterfaceLUID:  40,
+		State:          adapter.StateConnected,
+		TransmitOctets: 1_000,
+		ReceiveOctets:  2_000,
+	}
+	if traffic, reset := tracker.Sample(first, start, true); traffic.TransmitBPS != nil || traffic.ReceiveBPS != nil || reset {
+		t.Fatalf("first sample = %#v, reset = %v; want empty baseline", traffic, reset)
+	}
+
+	second := first
+	second.TransmitOctets += 250
+	second.ReceiveOctets += 500
+	traffic, reset := tracker.Sample(second, start.Add(2*time.Second), true)
+	if reset || traffic.TransmitBPS == nil || *traffic.TransmitBPS != 1_000 {
+		t.Fatalf("transmit traffic = %#v, reset = %v; want 1000 bps", traffic.TransmitBPS, reset)
+	}
+	if traffic.ReceiveBPS == nil || *traffic.ReceiveBPS != 2_000 {
+		t.Fatalf("receive traffic = %#v, want 2000 bps", traffic.ReceiveBPS)
+	}
+}
+
+func TestTrafficTrackerResetsForAdapterChangeAndCounterRollback(t *testing.T) {
+	tracker := trafficTracker{}
+	start := time.Date(2026, 9, 13, 3, 0, 0, 0, time.UTC)
+	info := adapter.Info{InterfaceIndex: 4, InterfaceLUID: 40, State: adapter.StateConnected, TransmitOctets: 100, ReceiveOctets: 200}
+	tracker.Sample(info, start, true)
+
+	changed := info
+	changed.InterfaceIndex = 8
+	changed.InterfaceLUID = 80
+	traffic, reset := tracker.Sample(changed, start.Add(time.Second), true)
+	if traffic.TransmitBPS != nil || traffic.ReceiveBPS != nil || !reset {
+		t.Fatalf("adapter change = %#v, reset = %v; want empty reset sample", traffic, reset)
+	}
+
+	rolledBack := changed
+	rolledBack.TransmitOctets = 50
+	rolledBack.ReceiveOctets = 50
+	traffic, reset = tracker.Sample(rolledBack, start.Add(2*time.Second), true)
+	if traffic.TransmitBPS != nil || traffic.ReceiveBPS != nil || reset {
+		t.Fatalf("counter rollback = %#v, reset = %v; want empty sample", traffic, reset)
+	}
+}
+
+func TestTrafficWindowKeepsLatestSamplesAndResets(t *testing.T) {
+	window := trafficWindow{limit: 2}
+	for index := 0; index < 3; index++ {
+		value := float64(index)
+		window.Add(TrafficSample{Traffic: Traffic{TransmitBPS: &value}}, false)
+	}
+	if samples := window.Samples(); len(samples) != 2 || *samples[0].TransmitBPS != 1 || *samples[1].TransmitBPS != 2 {
+		t.Fatalf("traffic samples = %#v", samples)
+	}
+	window.Add(TrafficSample{}, true)
+	if samples := window.Samples(); len(samples) != 1 || samples[0].TransmitBPS != nil {
+		t.Fatalf("reset traffic samples = %#v", samples)
 	}
 }
 
@@ -90,15 +183,17 @@ func TestHistoryWindowResetsWhenMethodChanges(t *testing.T) {
 
 func TestSnapshotJSONContainsNullableStatisticsAndHistory(t *testing.T) {
 	snapshot := Snapshot{
-		NIC: adapter.Info{Name: "Ethernet", State: adapter.StateConnected},
+		NIC: adapter.Info{Name: "Ethernet", State: adapter.StateConnected, TransmitOctets: 123, ReceiveOctets: 456},
+		Traffic: Traffic{},
 		Statistics: Statistics{
 			Method:             probe.MethodICMP,
 			Target:             "8.8.8.8",
 			FailureMetric:      FailureMetricPacketLoss,
 			FailureRatePercent: 100,
 		},
-		History:     []probe.Result{sample(probe.MethodICMP, false, 0)},
-		GeneratedAt: time.Date(2026, 9, 12, 10, 0, 1, 0, time.UTC),
+		History:        []probe.Result{sample(probe.MethodICMP, false, 0)},
+		TrafficHistory: []TrafficSample{{CheckedAt: time.Date(2026, 9, 12, 10, 0, 1, 0, time.UTC)}},
+		GeneratedAt:    time.Date(2026, 9, 12, 10, 0, 1, 0, time.UTC),
 	}
 
 	payload, err := json.Marshal(snapshot)
@@ -110,11 +205,23 @@ func TestSnapshotJSONContainsNullableStatisticsAndHistory(t *testing.T) {
 		t.Fatalf("Unmarshal() error = %v", err)
 	}
 	statistics := decoded["statistics"].(map[string]any)
-	if statistics["latestLatencyMs"] != nil || statistics["jitterMs"] != nil {
+	if statistics["latestLatencyMs"] != nil || statistics["averageLatencyMs"] != nil ||
+		statistics["minimumLatencyMs"] != nil || statistics["maximumLatencyMs"] != nil || statistics["jitterMs"] != nil {
 		t.Fatalf("statistics JSON = %s", payload)
 	}
+	nic := decoded["nic"].(map[string]any)
+	for _, key := range []string{"TransmitOctets", "ReceiveOctets", "transmitOctets", "receiveOctets"} {
+		if _, exists := nic[key]; exists {
+			t.Fatalf("private NIC counter %q leaked in JSON = %s", key, payload)
+		}
+	}
+	traffic := decoded["traffic"].(map[string]any)
+	if traffic["transmitBps"] != nil || traffic["receiveBps"] != nil {
+		t.Fatalf("traffic JSON = %s", payload)
+	}
 	history := decoded["history"].([]any)
-	if len(history) != 1 || decoded["nic"] == nil || decoded["generatedAt"] == nil {
+	trafficHistory := decoded["trafficHistory"].([]any)
+	if len(history) != 1 || len(trafficHistory) != 1 || decoded["nic"] == nil || decoded["generatedAt"] == nil {
 		t.Fatalf("snapshot JSON = %s", payload)
 	}
 }

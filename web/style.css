@@ -178,6 +178,36 @@ h1 {
   margin: 8px 0;
 }
 
+.latency-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.latency-summary > div {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--card);
+}
+
+.latency-summary strong {
+  display: block;
+  margin-top: 4px;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.latency-summary small {
+  color: var(--muted);
+  font-size: 9px;
+}
+
 .metric {
   min-width: 0;
   padding: 12px;
@@ -268,6 +298,67 @@ h1 {
   font-size: 11px;
 }
 
+.traffic-card {
+  margin-top: 8px;
+}
+
+.traffic-current {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 9px;
+}
+
+.traffic-current > div {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  column-gap: 6px;
+}
+
+.traffic-current strong {
+  grid-column: 2;
+  margin-top: 2px;
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.traffic-key {
+  grid-row: 1 / 3;
+  width: 3px;
+  height: 28px;
+  border-radius: 2px;
+}
+
+.transmit {
+  color: #ba9cff;
+  background: #ba9cff;
+}
+
+.receive {
+  color: var(--accent);
+  background: var(--accent);
+}
+
+.traffic-chart {
+  height: 96px;
+}
+
+.traffic-path {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+  background: none;
+}
+
+#traffic-chart-empty {
+  fill: var(--muted);
+  font-size: 11px;
+}
+
 .chart-footer {
   margin-top: 6px;
   font-size: 8px;
@@ -296,5 +387,9 @@ h1 {
 
   .metric strong {
     font-size: 22px;
+  }
+
+  .latency-summary {
+    grid-template-columns: 1fr 1fr;
   }
 }

@@ -33,7 +33,7 @@ func (windowsAPI) BestInterface(destination net.IP) (uint32, error) {
 
 func (windowsAPI) Interface(index uint32) (rawInfo, error) {
 	row := windows.MibIfRow2{InterfaceIndex: index}
-	if err := windows.GetIfEntry2Ex(windows.MibIfEntryNormalWithoutStatistics, &row); err != nil {
+	if err := windows.GetIfEntry2Ex(windows.MibIfEntryNormal, &row); err != nil {
 		return rawInfo{}, err
 	}
 
@@ -46,5 +46,7 @@ func (windowsAPI) Interface(index uint32) (rawInfo, error) {
 		MediaConnectState:    row.MediaConnectState,
 		TransmitLinkSpeedBPS: row.TransmitLinkSpeed,
 		ReceiveLinkSpeedBPS:  row.ReceiveLinkSpeed,
+		TransmitOctets:       row.OutOctets,
+		ReceiveOctets:        row.InOctets,
 	}, nil
 }
