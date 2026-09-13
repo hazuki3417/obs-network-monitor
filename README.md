@@ -50,7 +50,13 @@ go build -trimpath -o obs-network-monitor.exe .
 
 ## リリース
 
-正式版は `main` のコミットへ `vMAJOR.MINOR.PATCH` 形式のタグをpushすると、テスト済みWindows x64 ZIPとSHA-256を添付したGitHub Releaseとして自動公開されます。メンテナー向けの手順と安全条件は [リリース手順](docs/releasing.md) を参照してください。
+正式版はGitHubのActions画面から公開できます。
+
+1. **Prepare Release** を `develop` から実行し、`vMAJOR.MINOR.PATCH` を入力する。
+2. 自動作成された `develop → main` の昇格PRを確認してマージする。
+3. **Release** を `main` から実行し、同じバージョンを入力する。
+
+Release Actionは `main` を再検証し、タグ、テスト済みWindows x64 ZIP、SHA-256、GitHub Releaseを作成します。従来どおり、`main` のコミットへバージョンタグをpushして起動することもできます。メンテナー向けの設定、画面操作、安全条件は [リリース手順](docs/releasing.md) を参照してください。
 
 ## 設定
 

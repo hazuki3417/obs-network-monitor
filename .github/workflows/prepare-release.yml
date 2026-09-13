@@ -1,0 +1,124 @@
+name: Prepare Release
+
+run-name: Prepare ${{ inputs.version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version (vMAJOR.MINOR.PATCH)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prepare-release
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: Validate release request
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.validate.outputs.version }}
+
+    steps:
+      - name: Check out develop
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version and repository state
+        id: validate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_REF}" != "refs/heads/develop" ]]; then
+            echo "Prepare Release must be run with the develop branch selected." >&2
+            exit 1
+          fi
+          if [[ ! "${VERSION}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Version must use vMAJOR.MINOR.PATCH format: ${VERSION}" >&2
+            exit 1
+          fi
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${VERSION}" >/dev/null 2>&1; then
+            echo "Tag already exists: ${VERSION}" >&2
+            exit 1
+          fi
+
+          comparison=$(gh api "repos/${GITHUB_REPOSITORY}/compare/main...develop")
+          ahead=$(jq -r '.ahead_by' <<<"${comparison}")
+          if [[ "${ahead}" -eq 0 ]]; then
+            echo "develop has no commits to promote to main." >&2
+            exit 1
+          fi
+
+          existing_pr=$(gh pr list \
+            --repo "${GITHUB_REPOSITORY}" \
+            --base main \
+            --head develop \
+            --state open \
+            --json url \
+            --jq '.[0].url // empty')
+          if [[ -n "${existing_pr}" ]]; then
+            echo "An open develop -> main pull request already exists: ${existing_pr}" >&2
+            exit 1
+          fi
+
+          echo "version=${VERSION}" >>"${GITHUB_OUTPUT}"
+
+  quality-gate:
+    name: Verify develop
+    needs: validate
+    uses: ./.github/workflows/quality-gate.yml
+
+  create-promotion-pr:
+    name: Create promotion pull request
+    needs:
+      - validate
+      - quality-gate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - name: Create develop to main pull request
+        env:
+          EXPECTED_DEVELOP_SHA: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          current_develop_sha=$(gh api \
+            "repos/${GITHUB_REPOSITORY}/branches/develop" \
+            --jq '.commit.sha')
+          if [[ "${current_develop_sha}" != "${EXPECTED_DEVELOP_SHA}" ]]; then
+            echo "develop changed during validation. Run Prepare Release again." >&2
+            exit 1
+          fi
+
+          pr_url=$(gh pr create \
+            --repo "${GITHUB_REPOSITORY}" \
+            --base main \
+            --head develop \
+            --title "Release ${VERSION}: developをmainへ昇格" \
+            --body "$(cat <<EOF
+          ## Release candidate
+
+          - Version: \`${VERSION}\`
+          - Develop commit: \`${EXPECTED_DEVELOP_SHA}\`
+          - Validation run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}
+
+          このPRをマージした後、Actionsの **Release** をmainから実行し、同じバージョンを入力してください。
+          EOF
+          )")
+
+          echo "### Promotion pull request" >>"${GITHUB_STEP_SUMMARY}"
+          echo "${pr_url}" >>"${GITHUB_STEP_SUMMARY}"
