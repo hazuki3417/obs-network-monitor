@@ -2,24 +2,15 @@
   color-scheme: dark;
   font-family: Inter, "Segoe UI", system-ui, sans-serif;
   font-synthesis: none;
-  --panel: rgba(10, 14, 22, .92);
-  --card: rgba(255, 255, 255, .055);
-  --line: rgba(255, 255, 255, .11);
-  --muted: #8e9aae;
+  --line: rgba(255, 255, 255, .16);
+  --muted: #aeb8c8;
   --text: #f4f7fb;
   --accent: #62d9d1;
-  --waiting: #d8aa62;
-  --disconnected: #a4adbc;
+  --transmit: #ba9cff;
 }
 
 * {
   box-sizing: border-box;
-}
-
-.overlay-only,
-.overlay-section-title,
-.overlay-axis {
-  display: none;
 }
 
 html,
@@ -33,382 +24,11 @@ body {
 }
 
 body {
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-start;
-  padding: 18px;
-}
-
-.panel {
-  width: min(520px, calc(100vw - 36px));
-  padding: 20px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, .1);
-  border-radius: 16px;
-  background: var(--panel);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, .26);
-  font-variant-numeric: tabular-nums;
-}
-
-.header,
-.section-heading,
-.probe-row,
-.footer,
-.chart-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.header {
-  margin-bottom: 14px;
-}
-
-.eyebrow,
-h1,
-.nic-description {
-  margin: 0;
-}
-
-.eyebrow,
-.label,
-.section-heading,
-.chart-footer {
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: .12em;
-}
-
-h1 {
-  margin-top: 3px;
-  font-size: 24px;
-  font-weight: 650;
-  letter-spacing: -.03em;
-}
-
-.stream-state {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  min-width: 92px;
-  padding: 7px 10px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
-  justify-content: center;
-}
-
-.stream-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-.stream-state[data-state="live"] {
-  color: var(--accent);
-}
-
-.stream-state[data-state="connecting"] {
-  color: var(--waiting);
-}
-
-.stream-state[data-state="disconnected"] {
-  color: var(--disconnected);
-}
-
-.nic-card,
-.chart-card {
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--card);
-}
-
-.nic-card {
-  padding: 13px 14px 14px;
-}
-
-.nic-state {
-  color: var(--text);
-  letter-spacing: 0;
-}
-
-.nic-name {
-  display: block;
-  max-width: 100%;
-  margin-top: 7px;
-  overflow: hidden;
-  font-size: 18px;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.nic-description {
-  margin-top: 2px;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.link-speeds {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-top: 13px;
-}
-
-.link-speeds > div {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  padding-top: 9px;
-  border-top: 1px solid var(--line);
-}
-
-.link-speeds strong {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.metrics {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin: 8px 0;
-}
-
-.latency-summary {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.latency-summary > div {
-  min-width: 0;
-  padding: 9px 10px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--card);
-}
-
-.latency-summary strong {
-  display: block;
-  margin-top: 4px;
-  overflow: hidden;
-  font-size: 15px;
-  font-weight: 650;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.latency-summary small {
-  color: var(--muted);
-  font-size: 9px;
-}
-
-.metric {
-  min-width: 0;
-  padding: 12px;
-  border: 1px solid var(--line);
-  border-radius: 12px;
-  background: var(--card);
-}
-
-.metric > div {
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
-  margin-top: 4px;
-}
-
-.metric strong {
-  overflow: hidden;
-  font-size: 27px;
-  font-weight: 650;
-  letter-spacing: -.04em;
-  text-overflow: ellipsis;
-}
-
-.unit {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 650;
-}
-
-.probe-row {
-  gap: 10px;
-  min-width: 0;
-  margin: 8px 1px 10px;
-  font-size: 11px;
-}
-
-.method {
-  flex: 0 0 auto;
-  min-width: 46px;
-  padding: 4px 7px;
-  border: 1px solid var(--line);
-  border-radius: 5px;
-  color: var(--accent);
-  font-weight: 750;
-  text-align: center;
-}
-
-.target {
-  overflow: hidden;
-  color: var(--muted);
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.chart-card {
-  padding: 12px 14px 10px;
-}
-
-.chart {
-  display: block;
-  width: 100%;
-  height: 112px;
-  margin-top: 8px;
-  overflow: visible;
-}
-
-.grid-line {
-  stroke: var(--line);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-}
-
-#latency-path {
-  fill: none;
-  stroke: var(--accent);
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2;
-  vector-effect: non-scaling-stroke;
-}
-
-#latency-points circle {
-  fill: var(--accent);
-}
-
-#chart-empty {
-  fill: var(--muted);
-  font-size: 11px;
-}
-
-.traffic-card {
-  margin-top: 8px;
-}
-
-.traffic-current {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-top: 9px;
-}
-
-.traffic-current > div {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: center;
-  column-gap: 6px;
-}
-
-.traffic-current strong {
-  grid-column: 2;
-  margin-top: 2px;
-  font-size: 16px;
-  font-weight: 650;
-}
-
-.traffic-key {
-  grid-row: 1 / 3;
-  width: 3px;
-  height: 28px;
-  border-radius: 2px;
-}
-
-.transmit {
-  color: #ba9cff;
-  background: #ba9cff;
-}
-
-.receive {
-  color: var(--accent);
-  background: var(--accent);
-}
-
-.traffic-chart {
-  height: 96px;
-}
-
-.traffic-path {
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2;
-  vector-effect: non-scaling-stroke;
-  background: none;
-}
-
-#traffic-chart-empty {
-  fill: var(--muted);
-  font-size: 11px;
-}
-
-.chart-footer {
-  margin-top: 6px;
-  font-size: 8px;
-  letter-spacing: .08em;
-}
-
-.footer {
-  margin-top: 10px;
-  color: var(--muted);
-  font-size: 10px;
-}
-
-@media (max-width: 460px) {
-  body {
-    padding: 10px;
-  }
-
-  .panel {
-    width: calc(100vw - 20px);
-    padding: 14px;
-  }
-
-  .metric {
-    padding: 10px 8px;
-  }
-
-  .metric strong {
-    font-size: 22px;
-  }
-
-  .latency-summary {
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-body[data-view="overlay"] {
-  display: block;
-  width: 100%;
-  min-height: 100%;
   padding: 8px;
   text-shadow: 0 1px 3px rgba(0, 0, 0, .9);
 }
 
-body[data-view="overlay"] .panel {
+.panel {
   display: grid;
   grid-template-areas:
     "latency-title latency-title"
@@ -419,38 +39,24 @@ body[data-view="overlay"] .panel {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 0 28px;
   width: min(464px, calc(100vw - 16px));
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  box-shadow: none;
   overflow: visible;
+  font-variant-numeric: tabular-nums;
 }
 
-body[data-view="overlay"][data-sections="latency"] .panel {
+body[data-sections="latency"] .panel {
   grid-template-areas:
     "latency-title latency-title"
     "latency-current latency-summary"
     "latency-chart latency-chart";
 }
 
-body[data-view="overlay"][data-sections="traffic"] .panel {
+body[data-sections="traffic"] .panel {
   grid-template-areas:
     "traffic-title traffic-title"
     "traffic traffic";
 }
 
-body[data-view="overlay"] .header,
-body[data-view="overlay"] .nic-card,
-body[data-view="overlay"] .probe-row,
-body[data-view="overlay"] .footer,
-body[data-view="overlay"] .section-heading,
-body[data-view="overlay"] .chart-footer {
-  display: none;
-}
-
-body[data-view="overlay"] .overlay-section-title {
-  display: block;
+.section-title {
   margin: 0 0 8px;
   color: var(--text);
   font-size: 24px;
@@ -459,51 +65,44 @@ body[data-view="overlay"] .overlay-section-title {
   line-height: 1;
 }
 
-body[data-view="overlay"] .latency-title {
+.latency-title {
   grid-area: latency-title;
 }
 
-body[data-view="overlay"] .traffic-title {
+.traffic-title {
   grid-area: traffic-title;
   margin-top: 18px;
 }
 
-body[data-view="overlay"] .metrics {
+.metrics {
+  display: grid;
   grid-area: latency-current;
   grid-template-columns: 1fr;
   gap: 2px;
   margin: 0;
 }
 
-body[data-view="overlay"] .overlay-only {
-  display: grid;
-}
-
-body[data-view="overlay"] .metric,
-body[data-view="overlay"] .latency-summary > div {
+.metric,
+.latency-summary > div {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: baseline;
   gap: 8px;
+  min-width: 0;
   min-height: 23px;
   padding: 2px 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
 }
 
-body[data-view="overlay"] .metric > div {
+.metric > div {
   display: flex;
   align-items: baseline;
   justify-content: flex-end;
   gap: 4px;
-  margin: 0;
 }
 
-body[data-view="overlay"] .metric strong,
-body[data-view="overlay"] .latency-summary strong {
+.metric strong,
+.latency-summary strong {
   display: block;
-  margin: 0;
   overflow: visible;
   color: var(--text);
   font-size: 19px;
@@ -514,110 +113,145 @@ body[data-view="overlay"] .latency-summary strong {
   text-overflow: clip;
 }
 
-body[data-view="overlay"] .label {
+.label {
   align-self: center;
   color: var(--muted);
   font-size: 10px;
+  font-weight: 700;
   letter-spacing: .08em;
   white-space: nowrap;
 }
 
-body[data-view="overlay"] .unit,
-body[data-view="overlay"] .latency-summary small {
+.unit,
+.latency-summary small {
   color: var(--muted);
   font-size: 9px;
+  font-weight: 650;
 }
 
-body[data-view="overlay"] .latency-summary {
+.latency-summary {
+  display: grid;
   grid-area: latency-summary;
   grid-template-columns: 1fr;
   gap: 2px;
   margin: 0;
 }
 
-body[data-view="overlay"] .summary-failures {
-  display: none;
+.chart-card {
+  padding: 0;
 }
 
-body[data-view="overlay"] .latency-chart-card {
+.latency-chart-card {
   grid-area: latency-chart;
   margin-top: 8px;
 }
 
-body[data-view="overlay"] .chart-card {
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-}
-
-body[data-view="overlay"] .chart {
+.chart {
+  display: block;
   width: 100%;
   height: 104px;
   margin: 0;
+  overflow: visible;
 }
 
-body[data-view="overlay"] .traffic-card {
+.grid-line {
+  stroke: var(--line);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+#latency-path,
+.traffic-path {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+#latency-path {
+  stroke: var(--accent);
+}
+
+.traffic-card {
   grid-area: traffic;
   margin: 0;
 }
 
-body[data-view="overlay"] .traffic-current {
+.traffic-current {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 28px;
   margin: 0 0 6px;
 }
 
-body[data-view="overlay"] .traffic-current > div {
+.traffic-current > div {
+  display: grid;
   grid-template-columns: 3px minmax(0, 1fr) auto;
+  align-items: center;
   column-gap: 7px;
 }
 
-body[data-view="overlay"] .traffic-current strong {
+.traffic-current strong {
   grid-column: 3;
   grid-row: 1;
-  margin: 0;
   color: var(--text);
   font-size: 19px;
+  font-weight: 650;
   line-height: 1;
   text-align: right;
   white-space: nowrap;
 }
 
-body[data-view="overlay"] .traffic-key {
+.traffic-key {
   grid-column: 1;
   grid-row: 1;
+  width: 3px;
   height: 22px;
+  border-radius: 2px;
 }
 
-body[data-view="overlay"] .traffic-chart {
+.transmit {
+  color: var(--transmit);
+  background: var(--transmit);
+}
+
+.receive {
+  color: var(--accent);
+  background: var(--accent);
+}
+
+.traffic-path {
+  stroke: currentColor;
+  background: none;
+}
+
+.traffic-chart {
   height: 96px;
 }
 
-body[data-view="overlay"] .overlay-axis {
-  display: inline;
-}
-
-body[data-view="overlay"] .axis-label,
-body[data-view="overlay"] .axis-maximum {
+.axis-label,
+.axis-maximum {
   fill: var(--muted);
   font-size: 9px;
   font-weight: 700;
-  letter-spacing: 0;
 }
 
-body[data-view="overlay"] .axis-maximum {
+.axis-maximum {
   font-size: 8px;
 }
 
-body[data-view="overlay"] #latency-points {
-  display: none;
+#chart-empty,
+#traffic-chart-empty {
+  fill: var(--muted);
+  font-size: 11px;
 }
 
-body[data-view="overlay"][data-sections="latency"] .traffic-title,
-body[data-view="overlay"][data-sections="latency"] .traffic-card,
-body[data-view="overlay"][data-sections="traffic"] .latency-title,
-body[data-view="overlay"][data-sections="traffic"] .metrics,
-body[data-view="overlay"][data-sections="traffic"] .latency-summary,
-body[data-view="overlay"][data-sections="traffic"] .latency-chart-card {
+body[data-sections="latency"] .traffic-title,
+body[data-sections="latency"] .traffic-card,
+body[data-sections="traffic"] .latency-title,
+body[data-sections="traffic"] .metrics,
+body[data-sections="traffic"] .latency-summary,
+body[data-sections="traffic"] .latency-chart-card {
   display: none;
 }

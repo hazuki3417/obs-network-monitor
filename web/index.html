@@ -8,37 +8,7 @@
 </head>
 <body>
   <main class="panel" id="monitor-panel">
-    <header class="header">
-      <div>
-        <p class="eyebrow">OBS NETWORK MONITOR</p>
-        <h1>PC Network</h1>
-      </div>
-      <div class="stream-state" id="stream-state" data-state="connecting" aria-live="polite">
-        <span class="stream-dot" aria-hidden="true"></span>
-        <span id="stream-label">接続中</span>
-      </div>
-    </header>
-
-    <section class="nic-card" aria-labelledby="nic-heading">
-      <div class="section-heading">
-        <span id="nic-heading">ACTIVE NIC</span>
-        <span class="nic-state" id="nic-state">確認中</span>
-      </div>
-      <strong class="nic-name" id="nic-name">--</strong>
-      <p class="nic-description" id="nic-description">ネットワークアダプターを確認しています</p>
-      <div class="link-speeds">
-        <div>
-          <span class="label">UPLOAD LINK</span>
-          <strong id="tx-link-speed">--</strong>
-        </div>
-        <div>
-          <span class="label">DOWNLOAD LINK</span>
-          <strong id="rx-link-speed">--</strong>
-        </div>
-      </div>
-    </section>
-
-    <h2 class="overlay-section-title latency-title">LATENCY</h2>
+    <h2 class="section-title latency-title">LATENCY</h2>
 
     <section class="metrics" id="latency-metrics" aria-label="回線測定値">
       <div class="metric">
@@ -53,9 +23,9 @@
         <span class="label" id="failure-label">PACKET LOSS</span>
         <div><strong id="failure-rate">--</strong><span class="unit">%</span></div>
       </div>
-      <div class="metric overlay-only">
+      <div class="metric">
         <span class="label">FAIL STREAK</span>
-        <div><strong id="overlay-consecutive-failures">0</strong></div>
+        <div><strong id="consecutive-failures">0</strong></div>
       </div>
     </section>
 
@@ -72,19 +42,27 @@
         <span class="label">MAX LATENCY</span>
         <strong><span id="maximum-latency">--</span> <small>ms</small></strong>
       </div>
-      <div class="summary-failures">
-        <span class="label">FAIL STREAK</span>
-        <strong id="consecutive-failures">0</strong>
-      </div>
     </section>
 
-    <h2 class="overlay-section-title traffic-title">NIC TRAFFIC</h2>
+    <section class="chart-card latency-chart-card" id="latency-chart" aria-label="遅延グラフ">
+      <svg class="chart" id="latency-chart-svg" viewBox="-36 0 516 112" role="img" aria-label="直近60回の遅延グラフ">
+        <line class="grid-line" x1="0" y1="1" x2="480" y2="1"></line>
+        <line class="grid-line" x1="0" y1="56" x2="480" y2="56"></line>
+        <line class="grid-line" x1="0" y1="111" x2="480" y2="111"></line>
+        <path id="latency-path" d=""></path>
+        <g class="chart-axis" aria-hidden="true">
+          <text id="latency-axis-maximum" class="axis-label" x="-8" y="10" text-anchor="end">--</text>
+          <text id="latency-axis-middle" class="axis-label" x="-8" y="60" text-anchor="end">--</text>
+          <text class="axis-label" x="-8" y="111" text-anchor="end">0</text>
+          <text id="latency-overlay-maximum" class="axis-maximum" x="472" y="14" text-anchor="end">-- ms</text>
+        </g>
+        <text id="chart-empty" x="240" y="61" text-anchor="middle">成功した測定を待っています</text>
+      </svg>
+    </section>
 
-    <section class="chart-card traffic-card" id="traffic-section" aria-labelledby="traffic-heading">
-      <div class="section-heading">
-        <span id="traffic-heading">NIC TRAFFIC · LAST 60 SAMPLES</span>
-        <span id="traffic-chart-max">--</span>
-      </div>
+    <h2 class="section-title traffic-title">NIC TRAFFIC</h2>
+
+    <section class="chart-card traffic-card" id="traffic-section" aria-label="NIC通信量">
       <div class="traffic-current">
         <div>
           <span class="traffic-key transmit" aria-hidden="true"></span>
@@ -97,13 +75,13 @@
           <strong id="rx-traffic">--</strong>
         </div>
       </div>
-      <svg class="chart traffic-chart" id="traffic-chart-svg" viewBox="0 0 480 96" role="img" aria-label="直近60回のNIC送受信速度グラフ">
+      <svg class="chart traffic-chart" id="traffic-chart-svg" viewBox="-36 0 516 96" role="img" aria-label="直近60回のNIC送受信速度グラフ">
         <line class="grid-line" x1="0" y1="1" x2="480" y2="1"></line>
         <line class="grid-line" x1="0" y1="48" x2="480" y2="48"></line>
         <line class="grid-line" x1="0" y1="95" x2="480" y2="95"></line>
         <path id="traffic-transmit-path" class="traffic-path transmit" d=""></path>
         <path id="traffic-receive-path" class="traffic-path receive" d=""></path>
-        <g class="overlay-axis" aria-hidden="true">
+        <g class="chart-axis" aria-hidden="true">
           <text id="traffic-axis-maximum" class="axis-label" x="-8" y="10" text-anchor="end">--</text>
           <text id="traffic-axis-middle" class="axis-label" x="-8" y="52" text-anchor="end">--</text>
           <text class="axis-label" x="-8" y="95" text-anchor="end">0</text>
@@ -111,48 +89,7 @@
         </g>
         <text id="traffic-chart-empty" x="240" y="53" text-anchor="middle">通信量を測定しています</text>
       </svg>
-      <div class="chart-footer">
-        <span>60 samples ago</span>
-        <span id="traffic-sample-count">0 / 60</span>
-        <span>now</span>
-      </div>
     </section>
-
-    <section class="probe-row" aria-label="測定情報">
-      <span class="method" id="probe-method">--</span>
-      <span class="target" id="probe-target">測定先を待っています</span>
-    </section>
-
-    <section class="chart-card latency-chart-card" id="latency-chart" aria-labelledby="chart-heading">
-      <div class="section-heading">
-        <span id="chart-heading">LATENCY · LAST 60 SAMPLES</span>
-        <span id="chart-max">-- ms</span>
-      </div>
-      <svg class="chart" id="latency-chart-svg" viewBox="0 0 480 112" role="img" aria-label="直近60回の遅延グラフ">
-        <line class="grid-line" x1="0" y1="1" x2="480" y2="1"></line>
-        <line class="grid-line" x1="0" y1="56" x2="480" y2="56"></line>
-        <line class="grid-line" x1="0" y1="111" x2="480" y2="111"></line>
-        <path id="latency-path" d=""></path>
-        <g id="latency-points"></g>
-        <g class="overlay-axis" aria-hidden="true">
-          <text id="latency-axis-maximum" class="axis-label" x="-8" y="10" text-anchor="end">--</text>
-          <text id="latency-axis-middle" class="axis-label" x="-8" y="60" text-anchor="end">--</text>
-          <text class="axis-label" x="-8" y="111" text-anchor="end">0</text>
-          <text id="latency-overlay-maximum" class="axis-maximum" x="472" y="14" text-anchor="end">-- ms</text>
-        </g>
-        <text id="chart-empty" x="240" y="61" text-anchor="middle">成功した測定を待っています</text>
-      </svg>
-      <div class="chart-footer">
-        <span>60 samples ago</span>
-        <span id="sample-count">0 / 60</span>
-        <span>now</span>
-      </div>
-    </section>
-
-    <footer class="footer">
-      <span id="update-note">データを待っています</span>
-      <time id="updated">--:--:--</time>
-    </footer>
   </main>
   <script src="app.js"></script>
 </body>

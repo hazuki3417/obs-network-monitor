@@ -1,11 +1,4 @@
 const elements = {
-  streamState: document.querySelector('#stream-state'),
-  streamLabel: document.querySelector('#stream-label'),
-  nicName: document.querySelector('#nic-name'),
-  nicDescription: document.querySelector('#nic-description'),
-  nicState: document.querySelector('#nic-state'),
-  txLinkSpeed: document.querySelector('#tx-link-speed'),
-  rxLinkSpeed: document.querySelector('#rx-link-speed'),
   txTraffic: document.querySelector('#tx-traffic'),
   rxTraffic: document.querySelector('#rx-traffic'),
   latency: document.querySelector('#latency'),
@@ -16,29 +9,17 @@ const elements = {
   failureLabel: document.querySelector('#failure-label'),
   failureRate: document.querySelector('#failure-rate'),
   consecutiveFailures: document.querySelector('#consecutive-failures'),
-  overlayConsecutiveFailures: document.querySelector('#overlay-consecutive-failures'),
-  probeMethod: document.querySelector('#probe-method'),
-  probeTarget: document.querySelector('#probe-target'),
-  chartMax: document.querySelector('#chart-max'),
   chartPath: document.querySelector('#latency-path'),
-  chartPoints: document.querySelector('#latency-points'),
   chartEmpty: document.querySelector('#chart-empty'),
-  sampleCount: document.querySelector('#sample-count'),
-  trafficChartMax: document.querySelector('#traffic-chart-max'),
   trafficTransmitPath: document.querySelector('#traffic-transmit-path'),
   trafficReceivePath: document.querySelector('#traffic-receive-path'),
   trafficChartEmpty: document.querySelector('#traffic-chart-empty'),
-  trafficSampleCount: document.querySelector('#traffic-sample-count'),
   trafficAxisMaximum: document.querySelector('#traffic-axis-maximum'),
   trafficAxisMiddle: document.querySelector('#traffic-axis-middle'),
   trafficOverlayMaximum: document.querySelector('#traffic-overlay-maximum'),
   latencyAxisMaximum: document.querySelector('#latency-axis-maximum'),
   latencyAxisMiddle: document.querySelector('#latency-axis-middle'),
   latencyOverlayMaximum: document.querySelector('#latency-overlay-maximum'),
-  latencyChartSVG: document.querySelector('#latency-chart-svg'),
-  trafficChartSVG: document.querySelector('#traffic-chart-svg'),
-  updateNote: document.querySelector('#update-note'),
-  updated: document.querySelector('#updated'),
 };
 
 const chart = {width: 480, height: 112, capacity: 60};
@@ -48,7 +29,6 @@ let reconnectTimer;
 
 function applyViewOptions() {
   const query = new URLSearchParams(location.search);
-  const overlay = query.get('view') === 'overlay';
   const requestedSections = (query.get('sections') || '')
     .split(',')
     .map((section) => section.trim().toLowerCase())
@@ -56,21 +36,7 @@ function applyViewOptions() {
   const sections = new Set(requestedSections);
   const selection = sections.size === 1 ? [...sections][0] : 'all';
 
-  document.body.dataset.view = overlay ? 'overlay' : 'dashboard';
-  document.body.dataset.sections = overlay ? selection : 'all';
-  elements.latencyChartSVG.setAttribute(
-    'viewBox',
-    overlay ? '-36 0 516 112' : '0 0 480 112',
-  );
-  elements.trafficChartSVG.setAttribute(
-    'viewBox',
-    overlay ? '-36 0 516 96' : '0 0 480 96',
-  );
-}
-
-function setStreamState(state, label) {
-  elements.streamState.dataset.state = state;
-  elements.streamLabel.textContent = label;
+  document.body.dataset.sections = selection;
 }
 
 function formatSpeed(bitsPerSecond) {
@@ -86,20 +52,8 @@ function formatSpeed(bitsPerSecond) {
   return `${value.toFixed(digits)} ${units[unit]}`;
 }
 
-function formatLinkSpeed(bitsPerSecond) {
-  return bitsPerSecond > 0 ? formatSpeed(bitsPerSecond) : '--';
-}
-
 function formatValue(value, digits = 0) {
   return Number.isFinite(value) ? value.toFixed(digits) : '--';
-}
-
-function nicStateLabel(state) {
-  return {
-    connected: '接続済み',
-    disconnected: '未接続',
-    unknown: '状態不明',
-  }[state] || '状態不明';
 }
 
 function niceMaximum(value, minimum = 10) {
@@ -205,13 +159,11 @@ function renderTrafficChart(rawHistory) {
 
   elements.trafficTransmitPath.setAttribute('d', trafficPath(history, 'transmitBps', maximum));
   elements.trafficReceivePath.setAttribute('d', trafficPath(history, 'receiveBps', maximum));
-  elements.trafficChartMax.textContent = values.length ? formatSpeed(maximum) : '--';
   const scale = speedScale(maximum);
   elements.trafficAxisMaximum.textContent = values.length ? scale.maximum : '--';
   elements.trafficAxisMiddle.textContent = values.length ? scale.middle : '--';
   elements.trafficOverlayMaximum.textContent = values.length ? scale.label : '--';
   elements.trafficChartEmpty.hidden = values.length > 0;
-  elements.trafficSampleCount.textContent = `${history.length} / ${trafficChart.capacity}`;
 }
 
 function renderChart(rawHistory) {
@@ -226,40 +178,19 @@ function renderChart(rawHistory) {
     return {x, y};
   });
 
-  elements.chartPoints.replaceChildren();
-  history.forEach((entry, index) => {
-    if (!entry.success || !Number.isFinite(entry.rttMs)) return;
-    const x = ((firstSlot + index) / (chart.capacity - 1)) * chart.width;
-    const y = chart.height - (Math.max(0, entry.rttMs) / maximum) * chart.height;
-
-    const point = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    point.setAttribute('cx', x.toFixed(2));
-    point.setAttribute('cy', y.toFixed(2));
-    point.setAttribute('r', index === history.length - 1 ? '2.5' : '1.4');
-    elements.chartPoints.append(point);
-  });
-
   elements.chartPath.setAttribute('d', path);
-  elements.chartMax.textContent = successes.length ? `${maximum} ms` : '-- ms';
   elements.latencyAxisMaximum.textContent = successes.length ? compactNumber(maximum) : '--';
   elements.latencyAxisMiddle.textContent = successes.length ? compactNumber(maximum / 2) : '--';
   elements.latencyOverlayMaximum.textContent = successes.length ? `${maximum} ms` : '-- ms';
   elements.chartEmpty.hidden = successes.length > 0;
-  elements.sampleCount.textContent = `${history.length} / ${chart.capacity}`;
 }
 
 function renderSnapshot(snapshot) {
-  const nic = snapshot.nic || {};
   const traffic = snapshot.traffic || {};
   const statistics = snapshot.statistics || {};
   const history = Array.isArray(snapshot.history) ? snapshot.history : [];
   const trafficHistory = Array.isArray(snapshot.trafficHistory) ? snapshot.trafficHistory : [];
 
-  elements.nicName.textContent = nic.name || '--';
-  elements.nicDescription.textContent = nic.description || 'アダプター情報なし';
-  elements.nicState.textContent = nicStateLabel(nic.state);
-  elements.txLinkSpeed.textContent = formatLinkSpeed(nic.transmitLinkSpeedBps);
-  elements.rxLinkSpeed.textContent = formatLinkSpeed(nic.receiveLinkSpeedBps);
   elements.txTraffic.textContent = formatSpeed(traffic.transmitBps);
   elements.rxTraffic.textContent = formatSpeed(traffic.receiveBps);
   elements.latency.textContent = formatValue(statistics.latestLatencyMs);
@@ -274,20 +205,8 @@ function renderSnapshot(snapshot) {
   elements.consecutiveFailures.textContent = Number.isInteger(statistics.consecutiveFailures)
     ? statistics.consecutiveFailures
     : '--';
-  elements.overlayConsecutiveFailures.textContent = Number.isInteger(statistics.consecutiveFailures)
-    ? statistics.consecutiveFailures
-    : '--';
-  elements.probeMethod.textContent = statistics.method ? statistics.method.toUpperCase() : '--';
-  elements.probeTarget.textContent = statistics.target || '測定先なし';
   renderChart(history);
   renderTrafficChart(trafficHistory);
-
-  const generatedAt = new Date(snapshot.generatedAt);
-  elements.updated.textContent = Number.isNaN(generatedAt.getTime())
-    ? '--:--:--'
-    : generatedAt.toLocaleTimeString('ja-JP', {hour12: false});
-  elements.updateNote.textContent = '最終更新';
-  setStreamState('live', '受信中');
 }
 
 function scheduleReconnect() {
@@ -296,27 +215,19 @@ function scheduleReconnect() {
 }
 
 function connect() {
-  setStreamState('connecting', '接続中');
   const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
   const socket = new WebSocket(`${protocol}://${location.host}/ws`);
-
-  socket.onopen = () => {
-    setStreamState('connecting', 'データ待機');
-  };
 
   socket.onmessage = ({data}) => {
     try {
       renderSnapshot(JSON.parse(data));
     } catch (error) {
       console.error('Invalid monitor snapshot', error);
-      elements.updateNote.textContent = 'データ形式エラー';
     }
   };
 
   socket.onerror = () => socket.close();
   socket.onclose = () => {
-    setStreamState('disconnected', '再接続中');
-    elements.updateNote.textContent = '更新停止 · 最終受信';
     scheduleReconnect();
   };
 }

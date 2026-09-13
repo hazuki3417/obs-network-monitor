@@ -28,7 +28,8 @@ const html = fs.readFileSync('web/index.html', 'utf8');
 const css = fs.readFileSync('web/style.css', 'utf8');
 const ids = [...html.matchAll(/id="([^"]+)"/g)].map((match) => match[1]);
 assert.equal(new Set(ids).size, ids.length, 'HTML element IDs must be unique');
-assert.match(css, /body\[data-view="overlay"\] \.panel/, 'overlay styles must be scoped by view');
+assert.doesNotMatch(html, /id="nic-name"/, 'legacy NIC dashboard must not remain');
+assert.doesNotMatch(html, /OBS NETWORK MONITOR/, 'legacy product heading must not remain');
 assert.match(css, /width: min\(464px, calc\(100vw - 16px\)\)/, 'overlay must fit a 480 px source');
 assert.match(css, /data-sections="latency"/, 'latency-only styles must exist');
 assert.match(css, /data-sections="traffic"/, 'traffic-only styles must exist');
@@ -106,34 +107,29 @@ assert.equal(elements.get('average-latency').textContent, '15.5');
 assert.equal(elements.get('minimum-latency').textContent, '10');
 assert.equal(elements.get('maximum-latency').textContent, '20');
 assert.equal(elements.get('consecutive-failures').textContent, 0);
-assert.equal(elements.get('overlay-consecutive-failures').textContent, 0);
 assert.match(elements.get('latency-path').attributes.d, /^M .* C .* M .* C /, 'failed sample must split smooth curves');
 assert.match(elements.get('traffic-transmit-path').attributes.d, / C /, 'traffic path must be smooth');
 assert.match(elements.get('traffic-receive-path').attributes.d, / C /, 'traffic path must be smooth');
-assert.equal(elements.get('traffic-sample-count').textContent, '3 / 60');
 assert.equal(elements.get('latency-axis-maximum').textContent, '50');
 assert.equal(elements.get('latency-axis-middle').textContent, '25');
 assert.equal(elements.get('latency-overlay-maximum').textContent, '50 ms');
 assert.equal(elements.get('traffic-axis-maximum').textContent, '2');
 assert.equal(elements.get('traffic-axis-middle').textContent, '1');
 assert.equal(elements.get('traffic-overlay-maximum').textContent, '2 Mbps');
-assert.equal(body.dataset.view, 'dashboard');
 assert.equal(body.dataset.sections, 'all');
-assert.equal(elements.get('latency-chart-svg').attributes.viewBox, '0 0 480 112');
+assert.match(html, /id="latency-chart-svg" viewBox="-36 0 516 112"/);
+assert.match(html, /id="traffic-chart-svg" viewBox="-36 0 516 96"/);
 
-const overlay = loadUI('?view=overlay');
-assert.equal(overlay.body.dataset.view, 'overlay');
-assert.equal(overlay.body.dataset.sections, 'all');
-assert.equal(overlay.elements.get('latency-chart-svg').attributes.viewBox, '-36 0 516 112');
-assert.equal(overlay.elements.get('traffic-chart-svg').attributes.viewBox, '-36 0 516 96');
-
-const latencyOnly = loadUI('?view=overlay&sections=latency');
+const latencyOnly = loadUI('?sections=latency');
 assert.equal(latencyOnly.body.dataset.sections, 'latency');
 
-const trafficOnly = loadUI('?view=overlay&sections=traffic');
+const trafficOnly = loadUI('?sections=traffic');
 assert.equal(trafficOnly.body.dataset.sections, 'traffic');
 
-const invalidSections = loadUI('?view=overlay&sections=unknown');
+const invalidSections = loadUI('?sections=unknown');
 assert.equal(invalidSections.body.dataset.sections, 'all');
+
+const legacyOverlayURL = loadUI('?view=overlay');
+assert.equal(legacyOverlayURL.body.dataset.sections, 'all');
 
 console.log('Web UI tests passed.');
