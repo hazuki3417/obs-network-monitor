@@ -252,8 +252,8 @@ const bufferedAt = Date.parse('2026-09-14T12:01:03.000Z');
 trafficWithRenderBuffer.sockets[0].onmessage({data: JSON.stringify({
   ...snapshot,
   generatedAt: new Date(bufferedAt).toISOString(),
-  trafficHistory: Array.from({length: 64}, (_, index) => ({
-    checkedAt: new Date(bufferedAt - (63 - index) * 1000).toISOString(),
+  trafficHistory: Array.from({length: 74}, (_, index) => ({
+    checkedAt: new Date(bufferedAt - (73 - index) * 900).toISOString(),
     transmitBps: index * 1000,
     receiveBps: index * 2000,
   })),
@@ -263,7 +263,7 @@ assert.ok(
   trafficWithRenderBuffer.elements.get('traffic-chart-canvas').context.operations.some(
     (operation) => operation.name === 'moveTo' && operation.args[0] < 28,
   ),
-  'render history must retain samples beyond the visible 60-second window',
+  'render history must retain more than 60 seconds when intervals are short',
 );
 
 const trafficWithStableClock = loadPage(pages.traffic, '?parts=graph');

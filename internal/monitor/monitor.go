@@ -10,9 +10,10 @@ import (
 )
 
 const (
-	DefaultHistoryLimit    = 64
-	StatisticsHistoryLimit = 60
-	DefaultInterval        = time.Second
+	DefaultHistoryLimit     = 256
+	DefaultHistoryRetention = 65 * time.Second
+	StatisticsHistoryLimit  = 60
+	DefaultInterval         = time.Second
 )
 
 type FailureMetric string
@@ -101,8 +102,8 @@ func newMonitor(
 		interval:      interval,
 		logger:        logger,
 		now:           now,
-		history:       historyWindow{limit: historyLimit},
-		traffic:       trafficWindow{limit: historyLimit},
+		history:       historyWindow{limit: historyLimit, retention: DefaultHistoryRetention},
+		traffic:       trafficWindow{limit: historyLimit, retention: DefaultHistoryRetention},
 		subscribers:   make(map[chan Snapshot]struct{}),
 	}
 }
@@ -259,20 +260,32 @@ func (tracker *trafficTracker) setBaseline(info adapter.Info, checkedAt time.Tim
 }
 
 type trafficWindow struct {
-	limit   int
-	samples []TrafficSample
+	limit     int
+	retention time.Duration
+	samples   []TrafficSample
 }
 
 func (window *trafficWindow) Add(sample TrafficSample, reset bool) {
 	if reset {
 		window.samples = window.samples[:0]
 	}
-	if len(window.samples) < window.limit {
-		window.samples = append(window.samples, sample)
-		return
+	window.samples = append(window.samples, sample)
+	if window.retention > 0 && !sample.CheckedAt.IsZero() {
+		cutoff := sample.CheckedAt.Add(-window.retention)
+		first := 0
+		for first+1 < len(window.samples) && window.samples[first+1].CheckedAt.Before(cutoff) {
+			first++
+		}
+		if first > 0 {
+			copy(window.samples, window.samples[first:])
+			window.samples = window.samples[:len(window.samples)-first]
+		}
 	}
-	copy(window.samples, window.samples[1:])
-	window.samples[len(window.samples)-1] = sample
+	if window.limit > 0 && len(window.samples) > window.limit {
+		overflow := len(window.samples) - window.limit
+		copy(window.samples, window.samples[overflow:])
+		window.samples = window.samples[:window.limit]
+	}
 }
 
 func (window *trafficWindow) Samples() []TrafficSample {
@@ -280,8 +293,9 @@ func (window *trafficWindow) Samples() []TrafficSample {
 }
 
 type historyWindow struct {
-	limit   int
-	samples []probe.Result
+	limit     int
+	retention time.Duration
+	samples   []probe.Result
 }
 
 func (window *historyWindow) Add(result probe.Result) {
@@ -289,12 +303,23 @@ func (window *historyWindow) Add(result probe.Result) {
 		window.samples = window.samples[:0]
 	}
 
-	if len(window.samples) < window.limit {
-		window.samples = append(window.samples, result)
-		return
+	window.samples = append(window.samples, result)
+	if window.retention > 0 && !result.CheckedAt.IsZero() {
+		cutoff := result.CheckedAt.Add(-window.retention)
+		first := 0
+		for first+1 < len(window.samples) && window.samples[first+1].CheckedAt.Before(cutoff) {
+			first++
+		}
+		if first > 0 {
+			copy(window.samples, window.samples[first:])
+			window.samples = window.samples[:len(window.samples)-first]
+		}
 	}
-	copy(window.samples, window.samples[1:])
-	window.samples[len(window.samples)-1] = result
+	if window.limit > 0 && len(window.samples) > window.limit {
+		overflow := len(window.samples) - window.limit
+		copy(window.samples, window.samples[overflow:])
+		window.samples = window.samples[:window.limit]
+	}
 }
 
 func (window *historyWindow) Samples() []probe.Result {
