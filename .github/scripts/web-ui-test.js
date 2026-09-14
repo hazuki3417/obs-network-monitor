@@ -28,10 +28,12 @@ class FakeElement {
     this.textContent = '';
     this.lastChild = {textContent: ''};
     this.animations = [];
+    this.listeners = {};
     this.context = id.endsWith('-canvas') ? new FakeContext() : null;
   }
 
   setAttribute(name, value) { this.attributes[name] = value; }
+  addEventListener(name, listener) { this.listeners[name] = listener; }
   getContext(kind) { assert.equal(kind, '2d'); return this.context; }
   getBoundingClientRect() {
     return {width: 464, height: this.id.startsWith('traffic') ? 96 : 104};
@@ -82,6 +84,8 @@ for (const [name, page] of Object.entries(pages)) {
 assert.match(pages.home.html, /id="service-status"/);
 assert.match(pages.home.html, /id="websocket-status"/);
 assert.match(pages.home.html, /id="stream-status"/);
+assert.match(pages.home.html, /id="shutdown-button"/);
+assert.match(pages.home.html, /id="shutdown-status"/);
 assert.match(pages.home.html, /href="\/latency"/);
 assert.match(pages.home.html, /href="\/traffic"/);
 assert.match(pages.home.html, /href="\/route"/);
@@ -197,6 +201,7 @@ const snapshot = {
 };
 
 const home = loadPage(pages.home);
+assert.equal(typeof home.elements.get('shutdown-button').listeners.click, 'function');
 assert.equal(home.sockets.length, 1, 'home health check must connect to WebSocket');
 assert.equal(home.sockets[0].url, 'ws://127.0.0.1:8080/ws');
 assert.equal(home.elements.get('websocket-status').lastChild.textContent, 'Connecting');

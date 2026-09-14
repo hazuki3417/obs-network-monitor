@@ -2,11 +2,31 @@
   const websocketStatus = document.querySelector('#websocket-status');
   const streamStatus = document.querySelector('#stream-status');
   const lastUpdate = document.querySelector('#last-update');
+  const shutdownButton = document.querySelector('#shutdown-button');
+  const shutdownStatus = document.querySelector('#shutdown-status');
 
   function setStatus(element, text, state) {
     element.lastChild.textContent = text;
     element.className = `status is-${state}`;
   }
+
+  shutdownButton.addEventListener('click', async () => {
+    if (!window.confirm('OBS Network Monitorを終了しますか？')) return;
+
+    shutdownButton.disabled = true;
+    shutdownStatus.textContent = 'Shutting down...';
+    try {
+      const response = await window.fetch('/api/shutdown', {
+        method: 'POST',
+        headers: {'X-OBS-Network-Monitor-Shutdown': '1'},
+      });
+      if (!response.ok) throw new Error(`shutdown failed: ${response.status}`);
+      shutdownStatus.textContent = 'Stopped — this page can be closed.';
+    } catch {
+      shutdownStatus.textContent = '終了要求を送信できませんでした。';
+      shutdownButton.disabled = false;
+    }
+  });
 
   namespace.connect(
     (snapshot) => {

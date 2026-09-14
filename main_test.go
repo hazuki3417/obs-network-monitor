@@ -95,3 +95,54 @@ func TestDisplayHandler(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.StatusCode, http.StatusNotFound)
 	}
 }
+
+func TestShutdownHandlerRejectsUnsafeRequests(t *testing.T) {
+	tests := []struct {
+		name         string
+		method       string
+		host         string
+		origin       string
+		header       string
+		wantStatus   int
+		wantShutdown bool
+	}{
+		{
+			name:         "same origin POST",
+			method:       http.MethodPost,
+			host:         listenAddress,
+			origin:       "http://" + listenAddress,
+			header:       "1",
+			wantStatus:   http.StatusAccepted,
+			wantShutdown: true,
+		},
+		{name: "GET", method: http.MethodGet, host: listenAddress, wantStatus: http.StatusMethodNotAllowed},
+		{name: "different host", method: http.MethodPost, host: "localhost:8080", origin: "http://localhost:8080", header: "1", wantStatus: http.StatusForbidden},
+		{name: "different origin", method: http.MethodPost, host: listenAddress, origin: "https://example.com", header: "1", wantStatus: http.StatusForbidden},
+		{name: "missing header", method: http.MethodPost, host: listenAddress, origin: "http://" + listenAddress, wantStatus: http.StatusForbidden},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			shutdown := false
+			handler := shutdownHandler(listenAddress, func() { shutdown = true })
+			request := httptest.NewRequest(test.method, "http://"+listenAddress+"/api/shutdown", nil)
+			request.Host = test.host
+			if test.origin != "" {
+				request.Header.Set("Origin", test.origin)
+			}
+			if test.header != "" {
+				request.Header.Set(shutdownRequestHeader, test.header)
+			}
+			response := httptest.NewRecorder()
+
+			handler.ServeHTTP(response, request)
+
+			if response.Code != test.wantStatus {
+				t.Fatalf("status = %d, want %d", response.Code, test.wantStatus)
+			}
+			if shutdown != test.wantShutdown {
+				t.Fatalf("shutdown = %v, want %v", shutdown, test.wantShutdown)
+			}
+		})
+	}
+}

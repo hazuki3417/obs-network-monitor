@@ -176,6 +176,25 @@ function Test-RunningMonitor {
         $secondSnapshot = Receive-MonitorSnapshot
         Assert-MonitorSnapshot $firstSnapshot $ExpectedTargets
         Assert-MonitorSnapshot $secondSnapshot $ExpectedTargets
+
+        $shutdownResponse = Invoke-WebRequest `
+            -Uri "http://127.0.0.1:8080/api/shutdown" `
+            -Method Post `
+            -Headers @{
+                "Origin" = "http://127.0.0.1:8080"
+                "X-OBS-Network-Monitor-Shutdown" = "1"
+            } `
+            -TimeoutSec 5 `
+            -UseBasicParsing
+        if ($shutdownResponse.StatusCode -ne 202) {
+            throw "Shutdown endpoint returned $($shutdownResponse.StatusCode) in scenario '$Name'."
+        }
+        if (-not $process.WaitForExit(10000)) {
+            throw "Monitor did not stop gracefully in scenario '$Name'."
+        }
+        if ($process.ExitCode -ne 0) {
+            throw "Monitor exited with code $($process.ExitCode) after shutdown in scenario '$Name'."
+        }
     }
     finally {
         Stop-MonitorProcess $process
@@ -205,7 +224,11 @@ function Test-InvalidConfiguration {
         if ($process.ExitCode -eq 0) {
             throw "Monitor accepted an invalid configuration."
         }
-        $errorLog = Get-Content $standardError -Raw
+        $errorLogPath = Join-Path $scenarioDirectory "logs/error.log"
+        if (-not (Test-Path $errorLogPath)) {
+            throw "Invalid configuration did not create logs/error.log."
+        }
+        $errorLog = Get-Content $errorLogPath -Raw
         if ($errorLog -notmatch "load config") {
             throw "Invalid configuration error was not logged: $errorLog"
         }

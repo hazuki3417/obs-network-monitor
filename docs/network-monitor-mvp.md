@@ -288,7 +288,7 @@ OBS表示は透明なオーバーレイとし、背景、外枠、パネル、�
 
 OBS向け表示は `/latency`、`/traffic`、`/route` の3ページで構成する。`/latency` は遅延だけを480 x 270 px、`/traffic` はNIC通信量だけを480 x 210 px、`/route` は匿名化した経路を480 x 300 pxで表示する。複数を表示する場合は、OBSで独立したBrowser Sourceとして配置する。未知のパスは404を返す。
 
-ルート `/` にはLocal Web Server、WebSocket接続、モニターデータ受信の状態、最終更新時刻を表示する。状態アイコンと文言は固定幅の列で開始位置を揃える。あわせて `/latency`、`/traffic`、`/route`、GitHubリポジトリ、READMEの使い方をURLが見える箇条書きで表示し、フッターにMIT Licenseへのリンク、`© 2026 hazuki3417`、制作者を表示する。
+ルート `/` にはLocal Web Server、WebSocket接続、モニターデータ受信の状態、最終更新時刻、確認付きのアプリ終了ボタンを表示する。状態アイコンと文言は固定幅の列で開始位置を揃える。あわせて `/latency`、`/traffic`、`/route`、GitHubリポジトリ、READMEの使い方をURLが見える箇条書きで表示し、フッターにMIT Licenseへのリンク、`© 2026 hazuki3417`、制作者を表示する。
 
 数値一覧とグラフは、`/latency` と `/traffic` でWebSocket接続を分割せず表示だけを `parts` クエリで切り替える。`parts=values` は数値のみ、`parts=graph` はグラフのみ、`parts=values,graph` または未指定は両方を表示する。有効な値がない場合は両方へフォールバックする。`/route` は経路全体を1つの表示単位とし、`parts` では分割しない。
 
@@ -323,6 +323,10 @@ WebSocketが切断された場合は既存画面を消さず、配信状態は�
 - 設定不備は起動時エラーとする
 - WebSocketクライアントの切断は測定処理へ影響させない
 - 測定およびNIC取得のエラーは、継続運転を妨げない範囲でログへ記録する
+- 配布版はWindows GUIサブシステムでビルドし、コンソールを表示しない
+- エラーはexe隣接の `logs/error.log` だけへ遅延生成し、5 MiBで `error.previous.log` へ1世代ローテーションする
+- 終了APIは同一のHost・Originと専用ヘッダーを持つPOSTだけを受け付け、計測とHTTPサーバーをgraceful shutdownする
+- 起動時にブラウザを自動表示しない
 
 ## 10. テスト方針
 
