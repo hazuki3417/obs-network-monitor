@@ -26,9 +26,9 @@ func TestDisplayHandler(t *testing.T) {
 		present string
 		absent  string
 	}{
-		{path: "/", present: "latency-chart-svg"},
-		{path: "/latency", present: "latency-chart-svg", absent: "traffic-chart-svg"},
-		{path: "/traffic", present: "traffic-chart-svg", absent: "latency-chart-svg"},
+		{path: "/", present: "latency-chart-canvas"},
+		{path: "/latency", present: "latency-chart-canvas", absent: "traffic-chart-canvas"},
+		{path: "/traffic", present: "traffic-chart-canvas", absent: "latency-chart-canvas"},
 	}
 	for _, page := range pages {
 		t.Run(page.path, func(t *testing.T) {
@@ -62,8 +62,10 @@ func TestDisplayHandler(t *testing.T) {
 		"/latency/view.js",
 		"/traffic/app.js",
 		"/traffic/view.js",
+		"/shared/animation.js",
 		"/shared/base.css",
 		"/shared/chart.js",
+		"/shared/dom.js",
 		"/shared/options.js",
 		"/shared/websocket.js",
 	} {
