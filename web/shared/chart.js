@@ -61,7 +61,7 @@
     const context = canvas.getContext('2d');
     const logicalWidth = options.width;
     const logicalHeight = options.height;
-    const plot = {left: 36, right: logicalWidth, top: 1, bottom: logicalHeight - 1};
+    const plot = {left: 28, right: logicalWidth, top: 1, bottom: logicalHeight - 1};
     const plotWidth = plot.right - plot.left;
     const plotHeight = plot.bottom - plot.top;
     const windowMilliseconds = 60_000;

@@ -193,6 +193,11 @@ assert.equal(latency.body.dataset.parts, 'values');
 assert.equal(latency.frames.length, 0, 'values-only view must not render Canvas');
 latency.sockets[0].onmessage({data: JSON.stringify(snapshot)});
 assert.equal(latency.elements.get('latency').textContent, '20');
+assert.equal(
+  latency.elements.get('latency').animations.length,
+  0,
+  'value updates must not use a flashing animation',
+);
 
 const traffic = loadPage(pages.traffic, '?parts=graph');
 assert.equal(traffic.sockets.length, 1);
@@ -201,9 +206,23 @@ assert.equal(traffic.frames.length, 1);
 traffic.sockets[0].onmessage({data: JSON.stringify(snapshot)});
 assert.equal(traffic.elements.get('rx-traffic').textContent, '');
 traffic.runFrame(17);
-assert.ok(traffic.elements.get('traffic-chart-canvas').context.operations.some(
+const trafficOperations = traffic.elements.get('traffic-chart-canvas').context.operations;
+assert.ok(trafficOperations.some(
   (operation) => operation.name === 'bezierCurveTo',
 ));
+assert.ok(trafficOperations.some(
+  (operation) => operation.name === 'rect'
+    && operation.args[0] === 28
+    && operation.args[1] === 1
+    && operation.args[2] === 488
+    && operation.args[3] === 94,
+), 'graph lines must be clipped at a fixed left boundary');
+assert.equal(
+  trafficOperations.filter((operation) => operation.name === 'lineTo'
+    && operation.args[0] === 28).length,
+  0,
+  'the fixed clipping boundary must remain invisible',
+);
 
 const allParts = loadPage(pages.traffic, '?parts=values,graph');
 assert.equal(allParts.body.dataset.parts, 'all');
