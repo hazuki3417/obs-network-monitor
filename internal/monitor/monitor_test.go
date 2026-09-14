@@ -36,6 +36,24 @@ func TestHistoryWindowKeepsLatestSixtySamples(t *testing.T) {
 	}
 }
 
+func TestStatisticsUseLatestSixtySamplesFromRenderBuffer(t *testing.T) {
+	window := historyWindow{limit: DefaultHistoryLimit}
+	for index := 0; index < DefaultHistoryLimit; index++ {
+		window.Add(sample(probe.MethodICMP, index >= DefaultHistoryLimit-StatisticsHistoryLimit, int64(index)))
+	}
+
+	if len(window.Samples()) != DefaultHistoryLimit {
+		t.Fatalf("sample count = %d, want %d", len(window.Samples()), DefaultHistoryLimit)
+	}
+	statistics := window.Statistics()
+	if statistics.FailureRatePercent != 0 {
+		t.Fatalf("failure rate = %v, want 0", statistics.FailureRatePercent)
+	}
+	if statistics.MinimumLatencyMS == nil || *statistics.MinimumLatencyMS != 4 {
+		t.Fatalf("minimum latency = %v, want 4", statistics.MinimumLatencyMS)
+	}
+}
+
 func TestStatisticsSkipFailuresBetweenJitterPairs(t *testing.T) {
 	window := historyWindow{limit: 60}
 	window.Add(sample(probe.MethodICMP, true, 10))

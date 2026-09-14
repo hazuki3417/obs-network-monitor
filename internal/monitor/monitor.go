@@ -10,8 +10,9 @@ import (
 )
 
 const (
-	DefaultHistoryLimit = 60
-	DefaultInterval     = time.Second
+	DefaultHistoryLimit    = 64
+	StatisticsHistoryLimit = 60
+	DefaultInterval        = time.Second
 )
 
 type FailureMetric string
@@ -305,7 +306,11 @@ func (window *historyWindow) Statistics() Statistics {
 		return Statistics{}
 	}
 
-	last := window.samples[len(window.samples)-1]
+	samples := window.samples
+	if len(samples) > StatisticsHistoryLimit {
+		samples = samples[len(samples)-StatisticsHistoryLimit:]
+	}
+	last := samples[len(samples)-1]
 	statistics := Statistics{Method: last.Method, Target: last.Target}
 	if last.Method == probe.MethodHTTP {
 		statistics.FailureMetric = FailureMetricRequestFailure
@@ -318,7 +323,7 @@ func (window *historyWindow) Statistics() Statistics {
 	latencyTotal := int64(0)
 	jitterTotal := int64(0)
 	jitterPairs := 0
-	for index, sample := range window.samples {
+	for index, sample := range samples {
 		if !sample.Success {
 			failed++
 			continue
@@ -335,7 +340,7 @@ func (window *historyWindow) Statistics() Statistics {
 			maximum := latency
 			statistics.MaximumLatencyMS = &maximum
 		}
-		if index == 0 || !window.samples[index-1].Success {
+		if index == 0 || !samples[index-1].Success {
 			continue
 		}
 		difference := sample.RTTMillis - window.samples[index-1].RTTMillis
@@ -346,12 +351,12 @@ func (window *historyWindow) Statistics() Statistics {
 		jitterPairs++
 	}
 
-	statistics.FailureRatePercent = float64(failed) / float64(len(window.samples)) * 100
+	statistics.FailureRatePercent = float64(failed) / float64(len(samples)) * 100
 	if successful > 0 {
 		average := float64(latencyTotal) / float64(successful)
 		statistics.AverageLatencyMS = &average
 	}
-	for index := len(window.samples) - 1; index >= 0 && !window.samples[index].Success; index-- {
+	for index := len(samples) - 1; index >= 0 && !samples[index].Success; index-- {
 		statistics.ConsecutiveFailures++
 	}
 	if jitterPairs > 0 {

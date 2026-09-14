@@ -247,6 +247,52 @@ assert.equal(
   'a missing latest value must not be hidden by extending an older value',
 );
 
+const trafficWithRenderBuffer = loadPage(pages.traffic, '?parts=graph');
+const bufferedAt = Date.parse('2026-09-14T12:01:03.000Z');
+trafficWithRenderBuffer.sockets[0].onmessage({data: JSON.stringify({
+  ...snapshot,
+  generatedAt: new Date(bufferedAt).toISOString(),
+  trafficHistory: Array.from({length: 64}, (_, index) => ({
+    checkedAt: new Date(bufferedAt - (63 - index) * 1000).toISOString(),
+    transmitBps: index * 1000,
+    receiveBps: index * 2000,
+  })),
+})});
+trafficWithRenderBuffer.runFrame(17);
+assert.ok(
+  trafficWithRenderBuffer.elements.get('traffic-chart-canvas').context.operations.some(
+    (operation) => operation.name === 'moveTo' && operation.args[0] < 28,
+  ),
+  'render history must retain samples beyond the visible 60-second window',
+);
+
+const trafficWithStableClock = loadPage(pages.traffic, '?parts=graph');
+trafficWithStableClock.sockets[0].onmessage({data: JSON.stringify(snapshot)});
+trafficWithStableClock.runFrame(1000);
+const firstFrameOperations = trafficWithStableClock.elements
+  .get('traffic-chart-canvas').context.operations;
+const firstFrameSeriesX = firstFrameOperations.filter(
+  (operation) => operation.name === 'moveTo' && operation.args[0] !== 28,
+).at(-1).args[0];
+const operationsBeforeUpdate = firstFrameOperations.length;
+trafficWithStableClock.sockets[0].onmessage({data: JSON.stringify({
+  ...snapshot,
+  generatedAt: '2026-09-14T12:00:08.000Z',
+  trafficHistory: [
+    ...snapshot.trafficHistory,
+    {checkedAt: '2026-09-14T12:00:08.000Z', transmitBps: 750_000, receiveBps: 1_750_000},
+  ],
+})});
+trafficWithStableClock.runFrame(1017);
+const secondFrameSeriesX = firstFrameOperations.slice(operationsBeforeUpdate).filter(
+  (operation) => operation.name === 'moveTo' && operation.args[0] !== 28,
+).at(-1).args[0];
+assert.ok(
+  firstFrameSeriesX - secondFrameSeriesX > 0
+    && firstFrameSeriesX - secondFrameSeriesX < 0.2,
+  'WebSocket updates must not reset or move the rendering clock',
+);
+
 const allParts = loadPage(pages.traffic, '?parts=values,graph');
 assert.equal(allParts.body.dataset.parts, 'all');
 const invalidParts = loadPage(pages.latency, '?parts=unknown');

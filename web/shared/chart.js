@@ -65,12 +65,13 @@
     const plotWidth = plot.right - plot.left;
     const plotHeight = plot.bottom - plot.top;
     const windowMilliseconds = 60_000;
+    const visibleSampleLimit = 60;
+    let renderClock = null;
     let state = {
       history: [],
       maximum: options.minimum,
       hasValues: false,
-      anchor: Date.now(),
-      receivedAt: now(),
+      generatedAt: Date.now(),
     };
 
     function resize() {
@@ -117,7 +118,7 @@
     function timestamp(entry, index) {
       const parsed = Date.parse(entry.checkedAt);
       if (Number.isFinite(parsed)) return parsed;
-      return state.anchor - (state.history.length - 1 - index) * 1000;
+      return state.generatedAt - (state.history.length - 1 - index) * 1000;
     }
 
     function segmentsFor(key, visualNow) {
@@ -183,26 +184,34 @@
       resize();
       context.clearRect(0, 0, logicalWidth, logicalHeight);
       drawAxes();
-      const visualNow = state.anchor + Math.max(0, frameNow - state.receivedAt);
+      const visualNow = renderClock
+        ? renderClock.anchor + Math.max(0, frameNow - renderClock.startedAt)
+        : Date.now();
       drawSeries(visualNow);
     }
 
     const unsubscribe = namespace.animation.subscribe(draw);
     return {
       update(history, generatedAt) {
-        const trimmed = history.slice(-60);
+        const buffered = history.slice();
+        const visible = buffered.slice(-visibleSampleLimit);
         const values = [];
-        trimmed.forEach((entry) => options.series.forEach((series) => {
+        visible.forEach((entry) => options.series.forEach((series) => {
           const value = options.value(entry, series.key);
           if (Number.isFinite(value)) values.push(value);
         }));
         const parsedAnchor = Date.parse(generatedAt);
+        const nextGeneratedAt = Number.isFinite(parsedAnchor) ? parsedAnchor : Date.now();
+        const historyWasReset = state.history.length > 0 && buffered.length < state.history.length;
+        const timeMovedBackward = nextGeneratedAt < state.generatedAt;
+        if (renderClock === null || historyWasReset || timeMovedBackward) {
+          renderClock = {anchor: nextGeneratedAt, startedAt: now()};
+        }
         state = {
-          history: trimmed,
+          history: buffered,
           maximum: niceMaximum(Math.max(0, ...values), options.minimum),
           hasValues: values.length > 0,
-          anchor: Number.isFinite(parsedAnchor) ? parsedAnchor : Date.now(),
-          receivedAt: now(),
+          generatedAt: nextGeneratedAt,
         };
       },
       destroy: unsubscribe,
