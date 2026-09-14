@@ -15,7 +15,7 @@ import (
 	"obs-network-monitor/internal/probe"
 )
 
-//go:embed web/*
+//go:embed web
 var webFS embed.FS
 
 var upgrader = websocket.Upgrader{
@@ -42,21 +42,29 @@ func websocketHandler(source *monitor.Monitor) http.HandlerFunc {
 }
 
 func displayHandler(static fs.FS) (http.Handler, error) {
-	index, err := fs.ReadFile(static, "index.html")
-	if err != nil {
-		return nil, err
+	pageFiles := map[string]string{
+		"/":         "index.html",
+		"/latency":  "latency/index.html",
+		"/latency/": "latency/index.html",
+		"/traffic":  "traffic/index.html",
+		"/traffic/": "traffic/index.html",
+	}
+	pages := make(map[string][]byte, len(pageFiles))
+	for path, name := range pageFiles {
+		content, err := fs.ReadFile(static, name)
+		if err != nil {
+			return nil, err
+		}
+		pages[path] = content
 	}
 	files := http.FileServer(http.FS(static))
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/", "/latency", "/traffic":
+		if page, ok := pages[r.URL.Path]; ok {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
-			_, _ = w.Write(index)
-		case "/app.js", "/style.css":
-			files.ServeHTTP(w, r)
-		default:
-			http.NotFound(w, r)
+			_, _ = w.Write(page)
+			return
 		}
+		files.ServeHTTP(w, r)
 	}), nil
 }
 

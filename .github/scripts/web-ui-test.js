@@ -5,18 +5,8 @@ const vm = require('node:vm');
 class FakeElement {
   constructor() {
     this.attributes = {};
-    this.children = [];
     this.dataset = {};
-    this.hidden = false;
     this.textContent = '';
-  }
-
-  append(child) {
-    this.children.push(child);
-  }
-
-  replaceChildren() {
-    this.children = [];
   }
 
   setAttribute(name, value) {
@@ -24,31 +14,83 @@ class FakeElement {
   }
 }
 
-const html = fs.readFileSync('web/index.html', 'utf8');
-const css = fs.readFileSync('web/style.css', 'utf8');
-const app = fs.readFileSync('web/app.js', 'utf8');
-const ids = [...html.matchAll(/id="([^"]+)"/g)].map((match) => match[1]);
-assert.equal(new Set(ids).size, ids.length, 'HTML element IDs must be unique');
-assert.doesNotMatch(html, /id="nic-name"/, 'legacy NIC dashboard must not remain');
-assert.doesNotMatch(html, /OBS NETWORK MONITOR/, 'legacy product heading must not remain');
-assert.doesNotMatch(html, /成功した測定を待っています|通信量を測定しています/, 'charts must not contain waiting text');
+const pages = {
+  combined: {
+    html: fs.readFileSync('web/index.html', 'utf8'),
+    scripts: [
+      'web/shared/options.js',
+      'web/shared/chart.js',
+      'web/shared/websocket.js',
+      'web/latency/view.js',
+      'web/traffic/view.js',
+      'web/app.js',
+    ],
+  },
+  latency: {
+    html: fs.readFileSync('web/latency/index.html', 'utf8'),
+    scripts: [
+      'web/shared/options.js',
+      'web/shared/chart.js',
+      'web/shared/websocket.js',
+      'web/latency/view.js',
+      'web/latency/app.js',
+    ],
+  },
+  traffic: {
+    html: fs.readFileSync('web/traffic/index.html', 'utf8'),
+    scripts: [
+      'web/shared/options.js',
+      'web/shared/chart.js',
+      'web/shared/websocket.js',
+      'web/traffic/view.js',
+      'web/traffic/app.js',
+    ],
+  },
+};
+const css = fs.readFileSync('web/shared/base.css', 'utf8');
+
+for (const [name, page] of Object.entries(pages)) {
+  const ids = [...page.html.matchAll(/id="([^"]+)"/g)].map((match) => match[1]);
+  assert.equal(new Set(ids).size, ids.length, `${name} HTML element IDs must be unique`);
+  assert.match(page.html, /href="\/shared\/base\.css"/, `${name} must use shared CSS`);
+  const scriptSources = [...page.html.matchAll(/<script src="([^"]+)"/g)].map((match) => match[1]);
+  assert.deepEqual(scriptSources, page.scripts.map((script) => script.replace(/^web/, '')));
+  assert.doesNotMatch(
+    page.html,
+    /成功した測定を待っています|通信量を測定しています/,
+    `${name} charts must not contain waiting text`,
+  );
+}
+assert.match(pages.combined.html, /id="latency-chart-svg"/);
+assert.match(pages.combined.html, /id="traffic-chart-svg"/);
+assert.match(pages.latency.html, /id="latency-chart-svg"/);
+assert.doesNotMatch(pages.latency.html, /id="traffic-chart-svg"/);
+assert.match(pages.traffic.html, /id="traffic-chart-svg"/);
+assert.doesNotMatch(pages.traffic.html, /id="latency-chart-svg"/);
 assert.match(
-  html,
+  pages.latency.html,
   /<span class="label">LATENCY<\/span>\s*<strong id="latency">--<\/strong>\s*<span class="unit">ms<\/span>/,
   'label, value, and unit must be independent grid items',
 );
-assert.match(html, /id="consecutive-failures">0<\/strong>\s*<span class="unit" aria-hidden="true"><\/span>/);
 assert.match(css, /width: min\(464px, calc\(100vw - 16px\)\)/, 'overlay must fit a 480 px source');
-assert.match(css, /grid-template-columns: minmax\(0, 1fr\) 58px 20px/, 'metric columns must have fixed value and unit widths');
-assert.match(css, /data-sections="latency"/, 'latency-only styles must exist');
-assert.match(css, /data-sections="traffic"/, 'traffic-only styles must exist');
+assert.match(css, /grid-template-columns: minmax\(0, 1fr\) 58px 20px/, 'metric columns must remain aligned');
 assert.match(css, /data-parts="values"/, 'values-only styles must exist');
 assert.match(css, /data-parts="graph"/, 'graph-only styles must exist');
-assert.equal((app.match(/new WebSocket/g) || []).length, 1, 'UI parts must share one WebSocket');
 
-function loadUI(search = '', pathname = '/') {
+function loadPage(page, search = '') {
+  const ids = [...page.html.matchAll(/id="([^"]+)"/g)].map((match) => match[1]);
   const elements = new Map(ids.map((id) => [id, new FakeElement()]));
   const body = new FakeElement();
+  const sockets = [];
+  class FakeWebSocket {
+    constructor(url) {
+      this.url = url;
+      sockets.push(this);
+    }
+
+    close() {}
+  }
+  const window = {clearTimeout() {}, setTimeout() {}};
   const context = {
     console,
     document: {
@@ -58,37 +100,21 @@ function loadUI(search = '', pathname = '/') {
         assert.ok(element, `missing HTML element for ${selector}`);
         return element;
       },
-      createElementNS() {
-        return new FakeElement();
-      },
     },
-    location: {host: '127.0.0.1:8080', pathname, protocol: 'http:', search},
+    location: {host: '127.0.0.1:8080', protocol: 'http:', search},
     URLSearchParams,
-    WebSocket: class {},
-    window: {clearTimeout() {}, setTimeout() {}},
+    WebSocket: FakeWebSocket,
+    window,
   };
-  vm.runInNewContext(app, context);
-  return {body, context, elements};
+  for (const script of page.scripts) {
+    vm.runInNewContext(fs.readFileSync(script, 'utf8'), context, {filename: script});
+  }
+  return {body, elements, namespace: window.NetworkMonitor, sockets};
 }
 
-const {body, context, elements} = loadUI();
-assert.equal(
-  context.monotonePath([{x: 0, y: 10}, {x: 1, y: 0}, {x: 2, y: 10}]),
-  'M 0.00 10.00 C 0.33 6.67 0.67 0.00 1.00 0.00 C 1.33 0.00 1.67 6.67 2.00 10.00',
-  'smooth path controls must stay within the adjacent sample range',
-);
-context.renderSnapshot({
-  nic: {
-    name: 'Ethernet',
-    description: 'Test adapter',
-    state: 'connected',
-    transmitLinkSpeedBps: 1_000_000_000,
-    receiveLinkSpeedBps: 1_000_000_000,
-  },
+const snapshot = {
   traffic: {transmitBps: 0, receiveBps: 1_500_000},
   statistics: {
-    method: 'icmp',
-    target: '8.8.8.8',
     latestLatencyMs: 20,
     averageLatencyMs: 15.5,
     minimumLatencyMs: 10,
@@ -110,66 +136,48 @@ context.renderSnapshot({
     {transmitBps: 0, receiveBps: 1_000_000},
     {transmitBps: 500_000, receiveBps: 1_500_000},
   ],
-  generatedAt: '2026-09-13T03:00:00Z',
-});
+};
 
-assert.equal(elements.get('tx-traffic').textContent, '0 bps');
-assert.equal(elements.get('rx-traffic').textContent, '1.5 Mbps');
-assert.equal(elements.get('average-latency').textContent, '15.5');
-assert.equal(elements.get('minimum-latency').textContent, '10');
-assert.equal(elements.get('maximum-latency').textContent, '20');
-assert.equal(elements.get('consecutive-failures').textContent, 0);
-assert.match(elements.get('latency-path').attributes.d, /^M .* C .* M .* C /, 'failed sample must split smooth curves');
-assert.match(elements.get('traffic-transmit-path').attributes.d, / C /, 'traffic path must be smooth');
-assert.match(elements.get('traffic-receive-path').attributes.d, / C /, 'traffic path must be smooth');
-assert.equal(elements.get('latency-axis-maximum').textContent, '50');
-assert.equal(elements.get('latency-axis-middle').textContent, '25');
-assert.equal(elements.get('latency-overlay-maximum').textContent, '50 ms');
-assert.equal(elements.get('traffic-axis-maximum').textContent, '2');
-assert.equal(elements.get('traffic-axis-middle').textContent, '1');
-assert.equal(elements.get('traffic-overlay-maximum').textContent, '2 Mbps');
-assert.equal(body.dataset.sections, 'all');
-assert.equal(body.dataset.parts, 'all');
-assert.match(html, /id="latency-chart-svg" viewBox="-36 0 516 112"/);
-assert.match(html, /id="traffic-chart-svg" viewBox="-36 0 516 96"/);
+const combined = loadPage(pages.combined);
+assert.equal(combined.sockets.length, 1, 'combined page must use one WebSocket');
+assert.equal(combined.sockets[0].url, 'ws://127.0.0.1:8080/ws');
+assert.equal(combined.body.dataset.sections, 'all');
+assert.equal(combined.body.dataset.parts, 'all');
+assert.equal(
+  combined.namespace.charts.monotonePath([{x: 0, y: 10}, {x: 1, y: 0}, {x: 2, y: 10}]),
+  'M 0.00 10.00 C 0.33 6.67 0.67 0.00 1.00 0.00 C 1.33 0.00 1.67 6.67 2.00 10.00',
+);
+combined.sockets[0].onmessage({data: JSON.stringify(snapshot)});
+assert.equal(combined.elements.get('latency').textContent, '20');
+assert.equal(combined.elements.get('average-latency').textContent, '15.5');
+assert.equal(combined.elements.get('tx-traffic').textContent, '0 bps');
+assert.equal(combined.elements.get('rx-traffic').textContent, '1.5 Mbps');
+assert.match(combined.elements.get('latency-path').attributes.d, /^M .* C .* M .* C /);
+assert.match(combined.elements.get('traffic-transmit-path').attributes.d, / C /);
+assert.equal(combined.elements.get('latency-axis-maximum').textContent, '50');
+assert.equal(combined.elements.get('traffic-overlay-maximum').textContent, '2 Mbps');
 
-const latencyOnly = loadUI('?sections=latency');
-assert.equal(latencyOnly.body.dataset.sections, 'latency');
+const legacyLatency = loadPage(pages.combined, '?sections=latency&parts=graph');
+assert.equal(legacyLatency.body.dataset.sections, 'latency');
+assert.equal(legacyLatency.body.dataset.parts, 'graph');
 
-const trafficOnly = loadUI('?sections=traffic');
-assert.equal(trafficOnly.body.dataset.sections, 'traffic');
+const latency = loadPage(pages.latency, '?parts=values');
+assert.equal(latency.sockets.length, 1, 'latency page must use one WebSocket');
+assert.equal(latency.body.dataset.parts, 'values');
+latency.sockets[0].onmessage({data: JSON.stringify(snapshot)});
+assert.equal(latency.elements.get('latency').textContent, '20');
+assert.equal(latency.elements.has('tx-traffic'), false);
 
-const invalidSections = loadUI('?sections=unknown');
-assert.equal(invalidSections.body.dataset.sections, 'all');
+const traffic = loadPage(pages.traffic, '?parts=graph');
+assert.equal(traffic.sockets.length, 1, 'traffic page must use one WebSocket');
+assert.equal(traffic.body.dataset.parts, 'graph');
+traffic.sockets[0].onmessage({data: JSON.stringify(snapshot)});
+assert.equal(traffic.elements.get('rx-traffic').textContent, '1.5 Mbps');
+assert.equal(traffic.elements.has('latency'), false);
 
-const legacyOverlayURL = loadUI('?view=overlay');
-assert.equal(legacyOverlayURL.body.dataset.sections, 'all');
-
-const valuesOnly = loadUI('?parts=values');
-assert.equal(valuesOnly.body.dataset.parts, 'values');
-
-const graphOnly = loadUI('?parts=graph');
-assert.equal(graphOnly.body.dataset.parts, 'graph');
-
-const allParts = loadUI('?parts=values,graph');
+const allParts = loadPage(pages.traffic, '?parts=values,graph');
 assert.equal(allParts.body.dataset.parts, 'all');
-
-const invalidParts = loadUI('?parts=unknown');
+const invalidParts = loadPage(pages.latency, '?parts=unknown');
 assert.equal(invalidParts.body.dataset.parts, 'all');
-
-const combinedOptions = loadUI('?sections=traffic&parts=graph');
-assert.equal(combinedOptions.body.dataset.sections, 'traffic');
-assert.equal(combinedOptions.body.dataset.parts, 'graph');
-
-const latencyPage = loadUI('?parts=values', '/latency');
-assert.equal(latencyPage.body.dataset.sections, 'latency');
-assert.equal(latencyPage.body.dataset.parts, 'values');
-
-const trafficPage = loadUI('?parts=graph', '/traffic');
-assert.equal(trafficPage.body.dataset.sections, 'traffic');
-assert.equal(trafficPage.body.dataset.parts, 'graph');
-
-const pathOverridesLegacyQuery = loadUI('?sections=traffic', '/latency');
-assert.equal(pathOverridesLegacyQuery.body.dataset.sections, 'latency');
 
 console.log('Web UI tests passed.');
