@@ -29,6 +29,7 @@ func TestDisplayHandler(t *testing.T) {
 		{path: "/", present: "service-status", absent: "chart-canvas"},
 		{path: "/latency", present: "latency-chart-canvas", absent: "traffic-chart-canvas"},
 		{path: "/traffic", present: "traffic-chart-canvas", absent: "latency-chart-canvas"},
+		{path: "/route", present: "route-nodes", absent: "chart-canvas"},
 	}
 	for _, page := range pages {
 		t.Run(page.path, func(t *testing.T) {
@@ -63,6 +64,9 @@ func TestDisplayHandler(t *testing.T) {
 		"/latency/view.js",
 		"/traffic/app.js",
 		"/traffic/view.js",
+		"/route/app.js",
+		"/route/view.js",
+		"/route/route.css",
 		"/shared/animation.js",
 		"/shared/base.css",
 		"/shared/chart.js",

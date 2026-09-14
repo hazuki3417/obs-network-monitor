@@ -1,0 +1,120 @@
+:root {
+  color-scheme: dark;
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  font-synthesis: none;
+  --muted: #aeb8c8;
+  --text: #f4f7fb;
+  --accent: #62d9d1;
+  --warning: #f0bd69;
+  --line: rgba(255, 255, 255, .28);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  color: var(--text);
+}
+
+body {
+  padding: 8px;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, .9);
+}
+
+.route {
+  width: min(464px, calc(100vw - 16px));
+  font-variant-numeric: tabular-nums;
+}
+
+.route-nodes {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.route-node {
+  position: relative;
+  display: grid;
+  grid-template-columns: 16px 100px 58px minmax(0, 1fr);
+  align-items: center;
+  min-height: 46px;
+  column-gap: 8px;
+}
+
+.route-node:not(:last-child)::after {
+  position: absolute;
+  top: 27px;
+  bottom: -19px;
+  left: 7px;
+  width: 1px;
+  background: var(--line);
+  content: "";
+}
+
+.node-marker {
+  width: 7px;
+  height: 7px;
+  margin-left: 4px;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  background: rgba(98, 217, 209, .18);
+}
+
+.node-label,
+.node-status {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  white-space: nowrap;
+}
+
+.node-rtt {
+  color: var(--text);
+  font-size: 17px;
+  font-weight: 680;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.node-status {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.is-latency .node-marker,
+.is-latency-group .node-marker,
+.is-target-latency .node-marker,
+.is-incomplete .node-marker {
+  border-color: var(--warning);
+  background: rgba(240, 189, 105, .2);
+}
+
+.is-no-response .node-marker {
+  border-color: var(--muted);
+  background: rgba(174, 184, 200, .12);
+}
+
+.is-no-response .node-status {
+  color: var(--muted);
+}
+
+.is-latency .node-status,
+.is-latency-group .node-status,
+.is-target-latency .node-status,
+.is-incomplete .node-status {
+  color: var(--warning);
+}
+
+.is-muted {
+  opacity: .72;
+}

@@ -64,6 +64,10 @@ const pages = {
     html: fs.readFileSync('web/traffic/index.html', 'utf8'),
     scripts: [...overlaySharedScripts, 'web/traffic/view.js', 'web/traffic/app.js'],
   },
+  route: {
+    html: fs.readFileSync('web/route/index.html', 'utf8'),
+    scripts: ['web/shared/websocket.js', 'web/route/view.js', 'web/route/app.js'],
+  },
 };
 const overlayCSS = fs.readFileSync('web/shared/base.css', 'utf8');
 const homeCSS = fs.readFileSync('web/home.css', 'utf8');
@@ -80,6 +84,7 @@ assert.match(pages.home.html, /id="websocket-status"/);
 assert.match(pages.home.html, /id="stream-status"/);
 assert.match(pages.home.html, /href="\/latency"/);
 assert.match(pages.home.html, /href="\/traffic"/);
+assert.match(pages.home.html, /href="\/route"/);
 assert.match(pages.home.html, /github\.com\/hazuki3417\/obs-network-monitor/);
 assert.match(pages.home.html, /MIT License/);
 assert.match(pages.home.html, /© 2026/);
@@ -91,6 +96,8 @@ assert.match(pages.latency.html, /id="latency-chart-canvas"/);
 assert.doesNotMatch(pages.latency.html, /id="traffic-chart-canvas"/);
 assert.match(pages.traffic.html, /id="traffic-chart-canvas"/);
 assert.doesNotMatch(pages.traffic.html, /id="latency-chart-canvas"/);
+assert.match(pages.route.html, /id="route-nodes"/);
+assert.doesNotMatch(pages.route.html, /chart-canvas|parts=/);
 assert.match(overlayCSS, /data-parts="values"/);
 assert.match(overlayCSS, /data-parts="graph"/);
 assert.match(homeCSS, /grid-template-columns: minmax\(0, 1fr\) 160px/);
@@ -171,6 +178,22 @@ const snapshot = {
     {checkedAt: '2026-09-14T12:00:04.000Z', transmitBps: 0, receiveBps: 1_000_000},
     {checkedAt: '2026-09-14T12:00:05.000Z', transmitBps: 500_000, receiveBps: 1_500_000},
   ],
+  route: {
+    status: 'complete',
+    checkedAt: '2026-09-14T12:00:00.000Z',
+    hopCount: 8,
+    maxNodes: 6,
+    hops: [
+      {number: 1, responded: true, rttMs: 2, deltaRttMs: null, target: false},
+      {number: 2, responded: true, rttMs: 4, deltaRttMs: 2, target: false},
+      {number: 3, responded: true, rttMs: 30, deltaRttMs: 26, target: false},
+      {number: 4, responded: true, rttMs: 55, deltaRttMs: 25, target: false},
+      {number: 5, responded: true, rttMs: 80, deltaRttMs: 25, target: false},
+      {number: 6, responded: false, rttMs: null, deltaRttMs: null, target: false},
+      {number: 7, responded: true, rttMs: 82, deltaRttMs: null, target: false},
+      {number: 8, responded: true, rttMs: 84, deltaRttMs: 2, target: true},
+    ],
+  },
 };
 
 const home = loadPage(pages.home);
@@ -186,6 +209,49 @@ assert.notEqual(home.elements.get('last-update').textContent, '--');
 home.sockets[0].onclose();
 assert.equal(home.elements.get('websocket-status').lastChild.textContent, 'Reconnecting');
 assert.equal(home.elements.get('stream-status').lastChild.textContent, 'Waiting for data');
+
+const route = loadPage(pages.route);
+assert.equal(route.sockets.length, 1, 'route view must share the WebSocket endpoint');
+route.sockets[0].onmessage({data: JSON.stringify({
+  ...snapshot,
+  route: {
+    ...snapshot.route,
+    hops: snapshot.route.hops.map((hop) => ({
+      ...hop,
+      address: `192.0.2.${hop.number}`,
+      hostname: `router-${hop.number}.example.test`,
+    })),
+  },
+})});
+const routeHTML = route.elements.get('route-nodes').innerHTML;
+assert.match(routeHTML, /LOCAL/);
+assert.match(routeHTML, /TARGET/);
+assert.match(routeHTML, /MULTIPLE LATENCY JUMPS/);
+assert.doesNotMatch(routeHTML, /192\.0\.2|example\.test/);
+assert.ok(
+  (routeHTML.match(/<li/g) || []).length <= 6,
+  'route view must not exceed maxNodes',
+);
+
+route.sockets[0].onmessage({data: JSON.stringify({
+  ...snapshot,
+  route: {
+    ...snapshot.route,
+    hopCount: 3,
+    hops: [
+      {number: 1, responded: true, rttMs: 2, deltaRttMs: null, target: false},
+      {number: 2, responded: false, rttMs: null, deltaRttMs: null, target: false},
+      {number: 3, responded: true, rttMs: 10, deltaRttMs: null, target: true},
+    ],
+  },
+})});
+assert.match(route.elements.get('route-nodes').innerHTML, /NO RESPONSE/);
+
+route.sockets[0].onmessage({data: JSON.stringify({
+  ...snapshot,
+  route: {...snapshot.route, status: 'incomplete', hops: snapshot.route.hops.slice(0, 4)},
+})});
+assert.match(route.elements.get('route-nodes').innerHTML, /ROUTE INCOMPLETE/);
 
 const latency = loadPage(pages.latency, '?parts=values');
 assert.equal(latency.sockets.length, 1);

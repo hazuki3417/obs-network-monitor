@@ -7,6 +7,7 @@ import (
 
 	"obs-network-monitor/internal/adapter"
 	"obs-network-monitor/internal/probe"
+	"obs-network-monitor/internal/traceroute"
 )
 
 const (
@@ -46,12 +47,38 @@ type TrafficSample struct {
 	CheckedAt time.Time `json:"checkedAt"`
 }
 
+type RouteStatus string
+
+const (
+	RouteStatusMeasuring   RouteStatus = "measuring"
+	RouteStatusComplete    RouteStatus = "complete"
+	RouteStatusIncomplete  RouteStatus = "incomplete"
+	RouteStatusUnavailable RouteStatus = "unavailable"
+)
+
+type RouteHop struct {
+	Number     int     `json:"number"`
+	Responded  bool    `json:"responded"`
+	RTTMillis  *int64  `json:"rttMs"`
+	DeltaRTTMS *int64  `json:"deltaRttMs"`
+	Target     bool    `json:"target"`
+}
+
+type Route struct {
+	Status    RouteStatus `json:"status"`
+	CheckedAt time.Time   `json:"checkedAt"`
+	HopCount  int         `json:"hopCount"`
+	MaxNodes  int         `json:"maxNodes"`
+	Hops      []RouteHop  `json:"hops"`
+}
+
 type Snapshot struct {
 	NIC            adapter.Info    `json:"nic"`
 	Traffic        Traffic         `json:"traffic"`
 	Statistics     Statistics      `json:"statistics"`
 	History        []probe.Result  `json:"history"`
 	TrafficHistory []TrafficSample `json:"trafficHistory"`
+	Route          Route           `json:"route"`
 	GeneratedAt    time.Time       `json:"generatedAt"`
 }
 
@@ -67,13 +94,18 @@ type Monitor struct {
 	logger        Logger
 	now           func() time.Time
 
-	mu          sync.Mutex
-	history     historyWindow
-	traffic     trafficWindow
-	tracker     trafficTracker
-	latest      Snapshot
-	hasLatest   bool
-	subscribers map[chan Snapshot]struct{}
+	mu            sync.Mutex
+	history       historyWindow
+	traffic       trafficWindow
+	tracker       trafficTracker
+	racer         traceroute.Tracer
+	racerInterval time.Duration
+	tracerMaxNodes int
+	routeResult   traceroute.Result
+	route         Route
+	latest        Snapshot
+	hasLatest     bool
+	subscribers   map[chan Snapshot]struct{}
 }
 
 func New(provider adapter.Provider, measurer probe.Measurer, adapterTarget string, logger Logger) *Monitor {
@@ -108,7 +140,23 @@ func newMonitor(
 	}
 }
 
+func (monitor *Monitor) ConfigureTraceroute(tracer traceroute.Tracer, interval time.Duration, maxNodes int) {
+	if interval <= 0 {
+		interval = time.Minute
+	}
+	if maxNodes < 3 {
+		maxNodes = 3
+	}
+	monitor.tracer = tracer
+	monitor.tracerInterval = interval
+	monitor.tracerMaxNodes = maxNodes
+	monitor.route = Route{Status: RouteStatusMeasuring, MaxNodes: maxNodes}
+}
+
 func (monitor *Monitor) Run(ctx context.Context) {
+	if monitor.tracer != nil {
+		go monitor.runTraceroute(ctx)
+	}
 	if !monitor.collect(ctx) {
 		return
 	}
@@ -187,11 +235,87 @@ func (monitor *Monitor) collect(ctx context.Context) bool {
 		Statistics:     monitor.history.Statistics(),
 		History:        monitor.history.Samples(),
 		TrafficHistory: monitor.traffic.Samples(),
+		Route:          monitor.route,
 		GeneratedAt:    generatedAt,
 	}
 	monitor.hasLatest = true
 	monitor.publishLocked(monitor.latest)
 	return true
+}
+
+func (monitor *Monitor) runTraceroute(ctx context.Context) {
+	for {
+		if !monitor.collectRoute(ctx) {
+			return
+		}
+		timer := time.NewTimer(monitor.tracerInterval)
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				<-timer.C
+			}
+			return
+		case <-timer.C:
+		}
+	}
+}
+
+func (monitor *Monitor) collectRoute(ctx context.Context) bool {
+	result, traceErr := monitor.tracer.Trace(ctx)
+	if ctx.Err() != nil {
+		return false
+	}
+	if traceErr != nil && monitor.logger != nil {
+		monitor.logger.Printf("trace route: %v", traceErr)
+	}
+	checkedAt := result.CheckedAt
+	if checkedAt.IsZero() {
+		checkedAt = monitor.now()
+	}
+	route := sanitizedRoute(result, traceErr, monitor.tracerMaxNodes, checkedAt)
+
+	monitor.mu.Lock()
+	defer monitor.mu.Unlock()
+	monitor.routeResult = result
+	monitor.route = route
+	if monitor.hasLatest {
+		monitor.latest.Route = route
+		monitor.publishLocked(monitor.latest)
+	}
+	return true
+}
+
+func sanitizedRoute(result traceroute.Result, traceErr error, maxNodes int, checkedAt time.Time) Route {
+	status := RouteStatusIncomplete
+	if result.Complete {
+		status = RouteStatusComplete
+	} else if traceErr != nil && len(result.Hops) == 0 {
+		status = RouteStatusUnavailable
+	}
+	route := Route{
+		Status:    status,
+		CheckedAt: checkedAt,
+		HopCount:  len(result.Hops),
+		MaxNodes:  maxNodes,
+		Hops:      make([]RouteHop, 0, len(result.Hops)),
+	}
+	var previousRTT *int64
+	for _, hop := range result.Hops {
+		item := RouteHop{Number: hop.Number, Responded: hop.Responded, Target: hop.Target}
+		if hop.Responded {
+			rtt := hop.RTT.Milliseconds()
+			item.RTTMillis = &rtt
+			if previousRTT != nil {
+				delta := rtt - *previousRTT
+				item.DeltaRTTMS = &delta
+			}
+			previousRTT = &rtt
+		} else {
+			previousRTT = nil
+		}
+		route.Hops = append(route.Hops, item)
+	}
+	return route
 }
 
 func (monitor *Monitor) publishLocked(snapshot Snapshot) {
@@ -216,6 +340,7 @@ func cloneSnapshot(snapshot Snapshot) Snapshot {
 	result := snapshot
 	result.History = append([]probe.Result(nil), snapshot.History...)
 	result.TrafficHistory = append([]TrafficSample(nil), snapshot.TrafficHistory...)
+	result.Route.Hops = append([]RouteHop(nil), snapshot.Route.Hops...)
 	return result
 }
 

@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Route | OBS Network Monitor</title>
+  <link rel="stylesheet" href="/route/route.css">
+</head>
+<body>
+  <main class="route" aria-label="匿名化されたネットワーク経路">
+    <ol class="route-nodes" id="route-nodes">
+      <li class="route-node is-muted">
+        <span class="node-marker" aria-hidden="true"></span>
+        <span class="node-label">ROUTE</span>
+        <span class="node-status">MEASURING</span>
+      </li>
+    </ol>
+  </main>
+  <script src="/shared/websocket.js"></script>
+  <script src="/route/view.js"></script>
+  <script src="/route/app.js"></script>
+</body>
+</html>

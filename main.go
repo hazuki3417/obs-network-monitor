@@ -6,6 +6,7 @@ import (
 	"io/fs"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 
@@ -13,6 +14,7 @@ import (
 	"obs-network-monitor/internal/config"
 	"obs-network-monitor/internal/monitor"
 	"obs-network-monitor/internal/probe"
+	"obs-network-monitor/internal/traceroute"
 )
 
 //go:embed web
@@ -48,6 +50,8 @@ func displayHandler(static fs.FS) (http.Handler, error) {
 		"/latency/": "latency/index.html",
 		"/traffic":  "traffic/index.html",
 		"/traffic/": "traffic/index.html",
+		"/route":    "route/index.html",
+		"/route/":   "route/index.html",
 	}
 	pages := make(map[string][]byte, len(pageFiles))
 	for path, name := range pageFiles {
@@ -83,6 +87,11 @@ func main() {
 		probe.NewEngine(appConfig.ICMPTarget, appConfig.HTTPTarget),
 		appConfig.ICMPTarget,
 		log.Default(),
+	)
+	networkMonitor.ConfigureTraceroute(
+		traceroute.New(appConfig.TracerouteTarget()),
+		time.Duration(appConfig.Traceroute.IntervalSeconds)*time.Second,
+		appConfig.Traceroute.MaxNodes,
 	)
 	go networkMonitor.Run(context.Background())
 
