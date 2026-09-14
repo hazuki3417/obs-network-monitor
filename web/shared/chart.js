@@ -135,7 +135,13 @@
         const y = plot.bottom - (Math.max(0, value) / state.maximum) * plotHeight;
         segment.push({x, y});
       });
-      if (segment.length) segments.push(segment);
+      if (segment.length) {
+        const latest = segment[segment.length - 1];
+        if (latest.x < plot.right) {
+          segment.push({x: plot.right, y: latest.y});
+        }
+        segments.push(segment);
+      }
       return segments;
     }
 

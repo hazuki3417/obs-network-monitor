@@ -211,6 +211,10 @@ assert.ok(trafficOperations.some(
   (operation) => operation.name === 'bezierCurveTo',
 ));
 assert.ok(trafficOperations.some(
+  (operation) => operation.name === 'bezierCurveTo'
+    && operation.args[4] === 516,
+), 'the latest valid value must be held to the fixed right boundary');
+assert.ok(trafficOperations.some(
   (operation) => operation.name === 'rect'
     && operation.args[0] === 28
     && operation.args[1] === 1
@@ -222,6 +226,25 @@ assert.equal(
     && operation.args[0] === 28).length,
   0,
   'the fixed clipping boundary must remain invisible',
+);
+
+const trafficWithMissingLatest = loadPage(pages.traffic, '?parts=graph');
+trafficWithMissingLatest.sockets[0].onmessage({data: JSON.stringify({
+  ...snapshot,
+  generatedAt: '2026-09-14T12:00:06.000Z',
+  trafficHistory: [
+    ...snapshot.trafficHistory,
+    {checkedAt: '2026-09-14T12:00:06.000Z', transmitBps: null, receiveBps: null},
+  ],
+})});
+trafficWithMissingLatest.runFrame(17);
+assert.equal(
+  trafficWithMissingLatest.elements.get('traffic-chart-canvas').context.operations.some(
+    (operation) => operation.name === 'bezierCurveTo'
+      && operation.args[4] === 516,
+  ),
+  false,
+  'a missing latest value must not be hidden by extending an older value',
 );
 
 const allParts = loadPage(pages.traffic, '?parts=values,graph');
