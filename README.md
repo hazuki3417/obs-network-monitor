@@ -27,6 +27,7 @@ Windows PCが現在使用しているネットワークアダプターの通信�
 2. `obs-network-monitor-windows-x64.zip` とチェックサムファイルをダウンロードする。
 3. ZIPを展開し、`obs-network-monitor.exe` を通常ユーザー権限で実行する。
 4. ブラウザで `http://127.0.0.1:8080/` を開き、ヘルスチェックが正常であることを確認する。
+5. 終了するときは、同じページの **Stop application** を押す。
 
 ZIPにはexe、README、設定例、MIT Licenseが含まれます。成果物は署名されていないため、Windowsが発行元を確認できない旨を表示する場合があります。必要に応じて同じReleaseの `.sha256` ファイルで整合性を確認してください。
 
@@ -44,7 +45,7 @@ go build -trimpath -o obs-network-monitor.exe .
 ./obs-network-monitor.exe
 ```
 
-起動中はコンソールを閉じないでください。終了するときは `Ctrl+C` を押します。
+ソースから通常ビルドした場合はコンソールが表示され、`Ctrl+C` でも終了できます。GitHub Releaseの配布版はコンソールを表示しないため、`http://127.0.0.1:8080/` の **Stop application** から終了します。起動時にブラウザを自動表示する機能はありません。
 
 ## リリース
 
@@ -135,7 +136,7 @@ TracerouteはWindows ICMP APIでTTLを1から最大30まで増やし、各ホッ
 | 測定値が更新されない | ルートのヘルスチェックを確認し、OBSのURLが `/latency`、`/traffic`、`/route` のいずれか確認する |
 | OBS向け表示が見切れる | Latencyは480 x 270、NIC Trafficは480 x 210、Routeは480 x 300にする |
 
-測定・NIC取得の一時エラーではプロセスを終了せず、コンソールへ原因を記録して継続します。
+設定、測定、NIC取得、Traceroute、WebSocket、HTTPサーバーのエラーは、exeと同じフォルダーの `logs/error.log` へ記録します。正常時は `logs` フォルダーを作成しません。ログが5 MiBへ達すると `error.previous.log` へ1世代だけローテーションします。
 
 ## MVPの制約
 
