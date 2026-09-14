@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>NIC Traffic | OBS Network Monitor</title>
+  <link rel="stylesheet" href="/shared/base.css">
+</head>
+<body data-page="traffic">
+  <main class="panel" id="monitor-panel">
+    <h2 class="section-title traffic-title">NIC TRAFFIC</h2>
+
+    <section class="chart-card traffic-card" id="traffic-section" aria-label="NIC通信量">
+      <div class="traffic-current">
+        <div>
+          <span class="traffic-key transmit" aria-hidden="true"></span>
+          <span class="label">UPLOAD</span>
+          <strong id="tx-traffic">--</strong>
+        </div>
+        <div>
+          <span class="traffic-key receive" aria-hidden="true"></span>
+          <span class="label">DOWNLOAD</span>
+          <strong id="rx-traffic">--</strong>
+        </div>
+      </div>
+      <svg class="chart traffic-chart" id="traffic-chart-svg" viewBox="-36 0 516 96" role="img" aria-label="直近60回のNIC送受信速度グラフ">
+        <line class="grid-line" x1="0" y1="1" x2="480" y2="1"></line>
+        <line class="grid-line" x1="0" y1="48" x2="480" y2="48"></line>
+        <line class="grid-line" x1="0" y1="95" x2="480" y2="95"></line>
+        <path id="traffic-transmit-path" class="traffic-path transmit" d=""></path>
+        <path id="traffic-receive-path" class="traffic-path receive" d=""></path>
+        <g class="chart-axis" aria-hidden="true">
+          <text id="traffic-axis-maximum" class="axis-label" x="-8" y="10" text-anchor="end">--</text>
+          <text id="traffic-axis-middle" class="axis-label" x="-8" y="52" text-anchor="end">--</text>
+          <text class="axis-label" x="-8" y="95" text-anchor="end">0</text>
+          <text id="traffic-overlay-maximum" class="axis-maximum" x="472" y="14" text-anchor="end">--</text>
+        </g>
+      </svg>
+    </section>
+  </main>
+  <script src="/shared/options.js"></script>
+  <script src="/shared/chart.js"></script>
+  <script src="/shared/websocket.js"></script>
+  <script src="/traffic/view.js"></script>
+  <script src="/traffic/app.js"></script>
+</body>
+</html>

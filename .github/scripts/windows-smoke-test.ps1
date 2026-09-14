@@ -136,6 +136,22 @@ function Test-RunningMonitor {
             throw "Embedded monitor UI was not returned in scenario '$Name'."
         }
 
+        $displayPages = @(
+            @{ Path = "latency"; Present = "latency-chart-svg"; Absent = "traffic-chart-svg" },
+            @{ Path = "traffic"; Present = "traffic-chart-svg"; Absent = "latency-chart-svg" }
+        )
+        foreach ($displayPage in $displayPages) {
+            $displayResponse = Invoke-WebRequest `
+                -Uri "http://127.0.0.1:8080/$($displayPage.Path)?parts=graph" `
+                -TimeoutSec 2 `
+                -UseBasicParsing
+            if ($displayResponse.StatusCode -ne 200 `
+                -or $displayResponse.Content -notmatch $displayPage.Present `
+                -or $displayResponse.Content -match $displayPage.Absent) {
+                throw "Display endpoint '/$($displayPage.Path)' returned unexpected content in scenario '$Name'."
+            }
+        }
+
         $firstSnapshot = Receive-MonitorSnapshot
         $secondSnapshot = Receive-MonitorSnapshot
         Assert-MonitorSnapshot $firstSnapshot $ExpectedTargets
