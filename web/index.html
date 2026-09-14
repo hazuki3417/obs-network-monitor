@@ -52,18 +52,7 @@
     </section>
 
     <section class="chart-card latency-chart-card" id="latency-chart" aria-label="遅延グラフ">
-      <svg class="chart" id="latency-chart-svg" viewBox="-36 0 516 112" role="img" aria-label="直近60回の遅延グラフ">
-        <line class="grid-line" x1="0" y1="1" x2="480" y2="1"></line>
-        <line class="grid-line" x1="0" y1="56" x2="480" y2="56"></line>
-        <line class="grid-line" x1="0" y1="111" x2="480" y2="111"></line>
-        <path id="latency-path" d=""></path>
-        <g class="chart-axis" aria-hidden="true">
-          <text id="latency-axis-maximum" class="axis-label" x="-8" y="10" text-anchor="end">--</text>
-          <text id="latency-axis-middle" class="axis-label" x="-8" y="60" text-anchor="end">--</text>
-          <text class="axis-label" x="-8" y="111" text-anchor="end">0</text>
-          <text id="latency-overlay-maximum" class="axis-maximum" x="472" y="14" text-anchor="end">-- ms</text>
-        </g>
-      </svg>
+      <canvas class="chart" id="latency-chart-canvas" width="516" height="112" role="img" aria-label="直近60秒の遅延グラフ"></canvas>
     </section>
 
     <h2 class="section-title traffic-title">NIC TRAFFIC</h2>
@@ -81,22 +70,12 @@
           <strong id="rx-traffic">--</strong>
         </div>
       </div>
-      <svg class="chart traffic-chart" id="traffic-chart-svg" viewBox="-36 0 516 96" role="img" aria-label="直近60回のNIC送受信速度グラフ">
-        <line class="grid-line" x1="0" y1="1" x2="480" y2="1"></line>
-        <line class="grid-line" x1="0" y1="48" x2="480" y2="48"></line>
-        <line class="grid-line" x1="0" y1="95" x2="480" y2="95"></line>
-        <path id="traffic-transmit-path" class="traffic-path transmit" d=""></path>
-        <path id="traffic-receive-path" class="traffic-path receive" d=""></path>
-        <g class="chart-axis" aria-hidden="true">
-          <text id="traffic-axis-maximum" class="axis-label" x="-8" y="10" text-anchor="end">--</text>
-          <text id="traffic-axis-middle" class="axis-label" x="-8" y="52" text-anchor="end">--</text>
-          <text class="axis-label" x="-8" y="95" text-anchor="end">0</text>
-          <text id="traffic-overlay-maximum" class="axis-maximum" x="472" y="14" text-anchor="end">--</text>
-        </g>
-      </svg>
+      <canvas class="chart traffic-chart" id="traffic-chart-canvas" width="516" height="96" role="img" aria-label="直近60秒のNIC送受信速度グラフ"></canvas>
     </section>
   </main>
   <script src="/shared/options.js"></script>
+  <script src="/shared/animation.js"></script>
+  <script src="/shared/dom.js"></script>
   <script src="/shared/chart.js"></script>
   <script src="/shared/websocket.js"></script>
   <script src="/latency/view.js"></script>

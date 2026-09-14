@@ -1,6 +1,4 @@
 (function initializeTrafficView(namespace) {
-  const chart = {width: 480, height: 96, capacity: 60};
-
   function formatSpeed(bitsPerSecond) {
     if (!Number.isFinite(bitsPerSecond) || bitsPerSecond < 0) return '--';
     const units = ['bps', 'Kbps', 'Mbps', 'Gbps', 'Tbps'];
@@ -31,47 +29,35 @@
   }
 
   namespace.createTrafficView = function createTrafficView(root = document) {
+    const showValues = document.body.dataset.parts !== 'graph';
     const elements = {
       transmit: root.querySelector('#tx-traffic'),
       receive: root.querySelector('#rx-traffic'),
-      transmitPath: root.querySelector('#traffic-transmit-path'),
-      receivePath: root.querySelector('#traffic-receive-path'),
-      axisMaximum: root.querySelector('#traffic-axis-maximum'),
-      axisMiddle: root.querySelector('#traffic-axis-middle'),
-      overlayMaximum: root.querySelector('#traffic-overlay-maximum'),
+      chart: root.querySelector('#traffic-chart-canvas'),
     };
-
-    function path(history, key, maximum) {
-      const firstSlot = chart.capacity - history.length;
-      return namespace.charts.segmentedSmoothPath(history, (entry, index) => {
-        const value = entry[key];
-        if (!Number.isFinite(value)) return null;
-        const x = ((firstSlot + index) / (chart.capacity - 1)) * chart.width;
-        const y = chart.height - (Math.max(0, value) / maximum) * chart.height;
-        return {x, y};
-      });
-    }
-
-    function renderChart(rawHistory) {
-      const history = rawHistory.slice(-chart.capacity);
-      const values = history.flatMap((entry) => [entry.transmitBps, entry.receiveBps])
-        .filter(Number.isFinite);
-      const maximum = namespace.charts.niceMaximum(Math.max(0, ...values), 1000);
-
-      elements.transmitPath.setAttribute('d', path(history, 'transmitBps', maximum));
-      elements.receivePath.setAttribute('d', path(history, 'receiveBps', maximum));
-      const scale = speedScale(maximum);
-      elements.axisMaximum.textContent = values.length ? scale.maximum : '--';
-      elements.axisMiddle.textContent = values.length ? scale.middle : '--';
-      elements.overlayMaximum.textContent = values.length ? scale.label : '--';
-    }
+    const chart = elements.chart && document.body.dataset.parts !== 'values'
+      ? namespace.charts.createCanvasChart(elements.chart, {
+        width: 516,
+        height: 96,
+        minimum: 1000,
+        emptyLabel: '--',
+        scaleLabel: (maximum) => speedScale(maximum).label,
+        series: [
+          {key: 'transmitBps', color: 'transmit'},
+          {key: 'receiveBps', color: 'receive'},
+        ],
+        value: (entry, key) => entry[key],
+      })
+      : null;
 
     return function renderTraffic(snapshot) {
       const traffic = snapshot.traffic || {};
       const history = Array.isArray(snapshot.trafficHistory) ? snapshot.trafficHistory : [];
-      elements.transmit.textContent = formatSpeed(traffic.transmitBps);
-      elements.receive.textContent = formatSpeed(traffic.receiveBps);
-      renderChart(history);
+      if (showValues) {
+        namespace.dom.updateText(elements.transmit, formatSpeed(traffic.transmitBps));
+        namespace.dom.updateText(elements.receive, formatSpeed(traffic.receiveBps));
+      }
+      chart?.update(history, snapshot.generatedAt);
     };
   };
 }(window.NetworkMonitor = window.NetworkMonitor || {}));

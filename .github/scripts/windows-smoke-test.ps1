@@ -137,8 +137,8 @@ function Test-RunningMonitor {
         }
 
         $displayPages = @(
-            @{ Path = "latency"; Present = "latency-chart-svg"; Absent = "traffic-chart-svg" },
-            @{ Path = "traffic"; Present = "traffic-chart-svg"; Absent = "latency-chart-svg" }
+            @{ Path = "latency"; Present = "latency-chart-canvas"; Absent = "traffic-chart-canvas" },
+            @{ Path = "traffic"; Present = "traffic-chart-canvas"; Absent = "latency-chart-canvas" }
         )
         foreach ($displayPage in $displayPages) {
             $displayResponse = Invoke-WebRequest `
