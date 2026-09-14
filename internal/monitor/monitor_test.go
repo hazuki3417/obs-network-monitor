@@ -36,6 +36,49 @@ func TestHistoryWindowKeepsLatestSixtySamples(t *testing.T) {
 	}
 }
 
+func TestStatisticsUseLatestSixtySamplesFromRenderBuffer(t *testing.T) {
+	window := historyWindow{limit: DefaultHistoryLimit}
+	firstStatisticsIndex := DefaultHistoryLimit - StatisticsHistoryLimit
+	for index := 0; index < DefaultHistoryLimit; index++ {
+		window.Add(sample(probe.MethodICMP, index >= firstStatisticsIndex, int64(index)))
+	}
+
+	if len(window.Samples()) != DefaultHistoryLimit {
+		t.Fatalf("sample count = %d, want %d", len(window.Samples()), DefaultHistoryLimit)
+	}
+	statistics := window.Statistics()
+	if statistics.FailureRatePercent != 0 {
+		t.Fatalf("failure rate = %v, want 0", statistics.FailureRatePercent)
+	}
+	if statistics.MinimumLatencyMS == nil || *statistics.MinimumLatencyMS != int64(firstStatisticsIndex) {
+		t.Fatalf("minimum latency = %v, want %d", statistics.MinimumLatencyMS, firstStatisticsIndex)
+	}
+}
+
+func TestHistoryWindowsRetainSixtyFiveSecondsAcrossShortIntervals(t *testing.T) {
+	latency := historyWindow{limit: DefaultHistoryLimit, retention: DefaultHistoryRetention}
+	traffic := trafficWindow{limit: DefaultHistoryLimit, retention: DefaultHistoryRetention}
+	start := time.Date(2026, 9, 14, 12, 0, 0, 0, time.UTC)
+	for index := 0; index < 150; index++ {
+		checkedAt := start.Add(time.Duration(index) * 500 * time.Millisecond)
+		result := sample(probe.MethodICMP, true, int64(index))
+		result.CheckedAt = checkedAt
+		latency.Add(result)
+		traffic.Add(TrafficSample{CheckedAt: checkedAt}, false)
+	}
+
+	latencySamples := latency.Samples()
+	trafficSamples := traffic.Samples()
+	latencySpan := latencySamples[len(latencySamples)-1].CheckedAt.Sub(latencySamples[0].CheckedAt)
+	trafficSpan := trafficSamples[len(trafficSamples)-1].CheckedAt.Sub(trafficSamples[0].CheckedAt)
+	if latencySpan < DefaultHistoryRetention || trafficSpan < DefaultHistoryRetention {
+		t.Fatalf("retained spans = %v and %v, want at least %v", latencySpan, trafficSpan, DefaultHistoryRetention)
+	}
+	if len(latencySamples) <= 64 || len(trafficSamples) <= 64 {
+		t.Fatalf("sample counts = %d and %d, want more than 64", len(latencySamples), len(trafficSamples))
+	}
+}
+
 func TestStatisticsSkipFailuresBetweenJitterPairs(t *testing.T) {
 	window := historyWindow{limit: 60}
 	window.Add(sample(probe.MethodICMP, true, 10))

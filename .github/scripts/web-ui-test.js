@@ -203,13 +203,28 @@ const traffic = loadPage(pages.traffic, '?parts=graph');
 assert.equal(traffic.sockets.length, 1);
 assert.equal(traffic.body.dataset.parts, 'graph');
 assert.equal(traffic.frames.length, 1);
-traffic.sockets[0].onmessage({data: JSON.stringify(snapshot)});
+traffic.sockets[0].onmessage({data: JSON.stringify({
+  ...snapshot,
+  trafficHistory: Array.from({length: 5}, (_, index) => ({
+    checkedAt: `2026-09-14T12:00:0${index + 1}.000Z`,
+    transmitBps: index * 250_000,
+    receiveBps: (index + 1) * 300_000,
+  })),
+})});
 assert.equal(traffic.elements.get('rx-traffic').textContent, '');
 traffic.runFrame(17);
 const trafficOperations = traffic.elements.get('traffic-chart-canvas').context.operations;
 assert.ok(trafficOperations.some(
   (operation) => operation.name === 'bezierCurveTo',
 ));
+assert.ok(trafficOperations.some(
+  (operation) => operation.name === 'bezierCurveTo'
+    && operation.args[4] > 516,
+), 'received samples must be rendered in the hidden right overscan area');
+assert.equal(trafficOperations.some(
+  (operation) => operation.name === 'bezierCurveTo'
+    && operation.args[4] === 516,
+), false, 'the visible right edge must not use a synthetic horizontal extension');
 assert.ok(trafficOperations.some(
   (operation) => operation.name === 'rect'
     && operation.args[0] === 28
@@ -222,6 +237,61 @@ assert.equal(
     && operation.args[0] === 28).length,
   0,
   'the fixed clipping boundary must remain invisible',
+);
+
+const trafficWithRenderBuffer = loadPage(pages.traffic, '?parts=graph');
+const bufferedAt = Date.parse('2026-09-14T12:01:03.000Z');
+trafficWithRenderBuffer.sockets[0].onmessage({data: JSON.stringify({
+  ...snapshot,
+  generatedAt: new Date(bufferedAt).toISOString(),
+  trafficHistory: Array.from({length: 74}, (_, index) => ({
+    checkedAt: new Date(bufferedAt - (73 - index) * 900).toISOString(),
+    transmitBps: index * 1000,
+    receiveBps: index * 2000,
+  })),
+})});
+trafficWithRenderBuffer.runFrame(17);
+assert.ok(
+  trafficWithRenderBuffer.elements.get('traffic-chart-canvas').context.operations.some(
+    (operation) => operation.name === 'moveTo' && operation.args[0] < 28,
+  ),
+  'render history must retain more than 60 seconds when intervals are short',
+);
+
+const trafficWithStableClock = loadPage(pages.traffic, '?parts=graph');
+const stableTrafficHistory = Array.from({length: 5}, (_, index) => ({
+  checkedAt: `2026-09-14T12:00:0${index + 1}.000Z`,
+  transmitBps: index * 250_000,
+  receiveBps: (index + 1) * 300_000,
+}));
+trafficWithStableClock.sockets[0].onmessage({data: JSON.stringify({
+  ...snapshot,
+  trafficHistory: stableTrafficHistory,
+})});
+trafficWithStableClock.runFrame(1000);
+const firstFrameOperations = trafficWithStableClock.elements
+  .get('traffic-chart-canvas').context.operations;
+const firstFrameSeriesX = firstFrameOperations.filter(
+  (operation) => operation.name === 'moveTo' && operation.args[0] !== 28,
+).at(-1).args[0];
+const operationsBeforeUpdate = firstFrameOperations.length;
+trafficWithStableClock.sockets[0].onmessage({data: JSON.stringify({
+  ...snapshot,
+  generatedAt: '2026-09-14T12:00:08.000Z',
+  trafficHistory: [
+    stableTrafficHistory[0],
+    stableTrafficHistory[stableTrafficHistory.length - 1],
+    {checkedAt: '2026-09-14T12:00:08.000Z', transmitBps: 750_000, receiveBps: 1_750_000},
+  ],
+})});
+trafficWithStableClock.runFrame(1017);
+const secondFrameSeriesX = firstFrameOperations.slice(operationsBeforeUpdate).filter(
+  (operation) => operation.name === 'moveTo' && operation.args[0] !== 28,
+).at(-1).args[0];
+assert.ok(
+  firstFrameSeriesX - secondFrameSeriesX > 0
+    && firstFrameSeriesX - secondFrameSeriesX < 0.2,
+  'pruning overlapping history must not reset or move the rendering clock',
 );
 
 const allParts = loadPage(pages.traffic, '?parts=values,graph');

@@ -65,12 +65,13 @@
     const plotWidth = plot.right - plot.left;
     const plotHeight = plot.bottom - plot.top;
     const windowMilliseconds = 60_000;
+    const displayDelayMilliseconds = 2_000;
+    let renderClock = null;
     let state = {
       history: [],
       maximum: options.minimum,
       hasValues: false,
-      anchor: Date.now(),
-      receivedAt: now(),
+      generatedAt: Date.now(),
     };
 
     function resize() {
@@ -114,24 +115,28 @@
       );
     }
 
-    function timestamp(entry, index) {
+    function timestampFor(entry, index, history, generatedAt) {
       const parsed = Date.parse(entry.checkedAt);
       if (Number.isFinite(parsed)) return parsed;
-      return state.anchor - (state.history.length - 1 - index) * 1000;
+      return generatedAt - (history.length - 1 - index) * 1000;
     }
 
-    function segmentsFor(key, visualNow) {
+    function timestamp(entry, index) {
+      return timestampFor(entry, index, state.history, state.generatedAt);
+    }
+
+    function segmentsFor(key, visibleRight) {
       const segments = [];
       let segment = [];
       state.history.forEach((entry, index) => {
         const value = options.value(entry, key);
         const time = timestamp(entry, index);
-        if (!Number.isFinite(value) || time > visualNow + 1000) {
+        if (!Number.isFinite(value) || time > visibleRight + displayDelayMilliseconds + 1000) {
           if (segment.length) segments.push(segment);
           segment = [];
           return;
         }
-        const x = plot.right - ((visualNow - time) / windowMilliseconds) * plotWidth;
+        const x = plot.right - ((visibleRight - time) / windowMilliseconds) * plotWidth;
         const y = plot.bottom - (Math.max(0, value) / state.maximum) * plotHeight;
         segment.push({x, y});
       });
@@ -156,14 +161,14 @@
       });
     }
 
-    function drawSeries(visualNow) {
+    function drawSeries(visibleRight) {
       context.save();
       context.beginPath();
       context.rect(plot.left, plot.top, plotWidth, plotHeight);
       context.clip();
       options.series.forEach((series) => {
         context.beginPath();
-        segmentsFor(series.key, visualNow).forEach(drawSegment);
+        segmentsFor(series.key, visibleRight).forEach(drawSegment);
         context.strokeStyle = palette[series.color];
         context.lineWidth = 2;
         context.lineCap = 'round';
@@ -177,26 +182,46 @@
       resize();
       context.clearRect(0, 0, logicalWidth, logicalHeight);
       drawAxes();
-      const visualNow = state.anchor + Math.max(0, frameNow - state.receivedAt);
-      drawSeries(visualNow);
+      const renderNow = renderClock
+        ? renderClock.anchor + Math.max(0, frameNow - renderClock.startedAt)
+        : Date.now();
+      drawSeries(renderNow - displayDelayMilliseconds);
     }
 
     const unsubscribe = namespace.animation.subscribe(draw);
     return {
       update(history, generatedAt) {
-        const trimmed = history.slice(-60);
-        const values = [];
-        trimmed.forEach((entry) => options.series.forEach((series) => {
-          const value = options.value(entry, series.key);
-          if (Number.isFinite(value)) values.push(value);
-        }));
+        const buffered = history.slice();
         const parsedAnchor = Date.parse(generatedAt);
+        const nextGeneratedAt = Number.isFinite(parsedAnchor) ? parsedAnchor : Date.now();
+        const scaleLeft = nextGeneratedAt - displayDelayMilliseconds - windowMilliseconds;
+        const values = [];
+        buffered.forEach((entry, index) => {
+          const time = timestampFor(entry, index, buffered, nextGeneratedAt);
+          if (time < scaleLeft || time > nextGeneratedAt) return;
+          options.series.forEach((series) => {
+            const value = options.value(entry, series.key);
+            if (Number.isFinite(value)) values.push(value);
+          });
+        });
+        const previousLatest = state.history[state.history.length - 1];
+        const previousKey = previousLatest
+          ? `${previousLatest.checkedAt || ''}|${previousLatest.method || ''}`
+          : null;
+        const historyContinues = previousKey !== null && buffered.some((entry) => (
+          `${entry.checkedAt || ''}|${entry.method || ''}` === previousKey
+        ));
+        const historyWasReset = state.history.length > 0
+          && (buffered.length === 0 || !historyContinues);
+        const timeMovedBackward = nextGeneratedAt < state.generatedAt;
+        if (renderClock === null || historyWasReset || timeMovedBackward) {
+          renderClock = {anchor: nextGeneratedAt, startedAt: now()};
+        }
         state = {
-          history: trimmed,
+          history: buffered,
           maximum: niceMaximum(Math.max(0, ...values), options.minimum),
           hasValues: values.length > 0,
-          anchor: Number.isFinite(parsedAnchor) ? parsedAnchor : Date.now(),
-          receivedAt: now(),
+          generatedAt: nextGeneratedAt,
         };
       },
       destroy: unsubscribe,

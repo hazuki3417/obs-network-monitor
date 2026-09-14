@@ -10,8 +10,10 @@ import (
 )
 
 const (
-	DefaultHistoryLimit = 60
-	DefaultInterval     = time.Second
+	DefaultHistoryLimit     = 256
+	DefaultHistoryRetention = 65 * time.Second
+	StatisticsHistoryLimit  = 60
+	DefaultInterval         = time.Second
 )
 
 type FailureMetric string
@@ -100,8 +102,8 @@ func newMonitor(
 		interval:      interval,
 		logger:        logger,
 		now:           now,
-		history:       historyWindow{limit: historyLimit},
-		traffic:       trafficWindow{limit: historyLimit},
+		history:       historyWindow{limit: historyLimit, retention: DefaultHistoryRetention},
+		traffic:       trafficWindow{limit: historyLimit, retention: DefaultHistoryRetention},
 		subscribers:   make(map[chan Snapshot]struct{}),
 	}
 }
@@ -258,20 +260,32 @@ func (tracker *trafficTracker) setBaseline(info adapter.Info, checkedAt time.Tim
 }
 
 type trafficWindow struct {
-	limit   int
-	samples []TrafficSample
+	limit     int
+	retention time.Duration
+	samples   []TrafficSample
 }
 
 func (window *trafficWindow) Add(sample TrafficSample, reset bool) {
 	if reset {
 		window.samples = window.samples[:0]
 	}
-	if len(window.samples) < window.limit {
-		window.samples = append(window.samples, sample)
-		return
+	window.samples = append(window.samples, sample)
+	if window.retention > 0 && !sample.CheckedAt.IsZero() {
+		cutoff := sample.CheckedAt.Add(-window.retention)
+		first := 0
+		for first+1 < len(window.samples) && window.samples[first+1].CheckedAt.Before(cutoff) {
+			first++
+		}
+		if first > 0 {
+			copy(window.samples, window.samples[first:])
+			window.samples = window.samples[:len(window.samples)-first]
+		}
 	}
-	copy(window.samples, window.samples[1:])
-	window.samples[len(window.samples)-1] = sample
+	if window.limit > 0 && len(window.samples) > window.limit {
+		overflow := len(window.samples) - window.limit
+		copy(window.samples, window.samples[overflow:])
+		window.samples = window.samples[:window.limit]
+	}
 }
 
 func (window *trafficWindow) Samples() []TrafficSample {
@@ -279,8 +293,9 @@ func (window *trafficWindow) Samples() []TrafficSample {
 }
 
 type historyWindow struct {
-	limit   int
-	samples []probe.Result
+	limit     int
+	retention time.Duration
+	samples   []probe.Result
 }
 
 func (window *historyWindow) Add(result probe.Result) {
@@ -288,12 +303,23 @@ func (window *historyWindow) Add(result probe.Result) {
 		window.samples = window.samples[:0]
 	}
 
-	if len(window.samples) < window.limit {
-		window.samples = append(window.samples, result)
-		return
+	window.samples = append(window.samples, result)
+	if window.retention > 0 && !result.CheckedAt.IsZero() {
+		cutoff := result.CheckedAt.Add(-window.retention)
+		first := 0
+		for first+1 < len(window.samples) && window.samples[first+1].CheckedAt.Before(cutoff) {
+			first++
+		}
+		if first > 0 {
+			copy(window.samples, window.samples[first:])
+			window.samples = window.samples[:len(window.samples)-first]
+		}
 	}
-	copy(window.samples, window.samples[1:])
-	window.samples[len(window.samples)-1] = result
+	if window.limit > 0 && len(window.samples) > window.limit {
+		overflow := len(window.samples) - window.limit
+		copy(window.samples, window.samples[overflow:])
+		window.samples = window.samples[:window.limit]
+	}
 }
 
 func (window *historyWindow) Samples() []probe.Result {
@@ -305,7 +331,11 @@ func (window *historyWindow) Statistics() Statistics {
 		return Statistics{}
 	}
 
-	last := window.samples[len(window.samples)-1]
+	samples := window.samples
+	if len(samples) > StatisticsHistoryLimit {
+		samples = samples[len(samples)-StatisticsHistoryLimit:]
+	}
+	last := samples[len(samples)-1]
 	statistics := Statistics{Method: last.Method, Target: last.Target}
 	if last.Method == probe.MethodHTTP {
 		statistics.FailureMetric = FailureMetricRequestFailure
@@ -318,7 +348,7 @@ func (window *historyWindow) Statistics() Statistics {
 	latencyTotal := int64(0)
 	jitterTotal := int64(0)
 	jitterPairs := 0
-	for index, sample := range window.samples {
+	for index, sample := range samples {
 		if !sample.Success {
 			failed++
 			continue
@@ -335,7 +365,7 @@ func (window *historyWindow) Statistics() Statistics {
 			maximum := latency
 			statistics.MaximumLatencyMS = &maximum
 		}
-		if index == 0 || !window.samples[index-1].Success {
+		if index == 0 || !samples[index-1].Success {
 			continue
 		}
 		difference := sample.RTTMillis - window.samples[index-1].RTTMillis
@@ -346,12 +376,12 @@ func (window *historyWindow) Statistics() Statistics {
 		jitterPairs++
 	}
 
-	statistics.FailureRatePercent = float64(failed) / float64(len(window.samples)) * 100
+	statistics.FailureRatePercent = float64(failed) / float64(len(samples)) * 100
 	if successful > 0 {
 		average := float64(latencyTotal) / float64(successful)
 		statistics.AverageLatencyMS = &average
 	}
-	for index := len(window.samples) - 1; index >= 0 && !window.samples[index].Success; index-- {
+	for index := len(samples) - 1; index >= 0 && !samples[index].Success; index-- {
 		statistics.ConsecutiveFailures++
 	}
 	if jitterPairs > 0 {
