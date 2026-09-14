@@ -27,12 +27,16 @@ let reconnectTimer;
 
 function applyViewOptions() {
   const query = new URLSearchParams(location.search);
+  const pathSection = {
+    '/latency': 'latency',
+    '/traffic': 'traffic',
+  }[location.pathname];
   const requestedSections = (query.get('sections') || '')
     .split(',')
     .map((section) => section.trim().toLowerCase())
     .filter((section) => section === 'latency' || section === 'traffic');
   const sections = new Set(requestedSections);
-  const sectionSelection = sections.size === 1 ? [...sections][0] : 'all';
+  const sectionSelection = pathSection || (sections.size === 1 ? [...sections][0] : 'all');
   const requestedParts = (query.get('parts') || '')
     .split(',')
     .map((part) => part.trim().toLowerCase())

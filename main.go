@@ -41,6 +41,25 @@ func websocketHandler(source *monitor.Monitor) http.HandlerFunc {
 	}
 }
 
+func displayHandler(static fs.FS) (http.Handler, error) {
+	index, err := fs.ReadFile(static, "index.html")
+	if err != nil {
+		return nil, err
+	}
+	files := http.FileServer(http.FS(static))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/", "/latency", "/traffic":
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			_, _ = w.Write(index)
+		case "/app.js", "/style.css":
+			files.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	}), nil
+}
+
 func main() {
 	appConfig, err := config.LoadFromExecutable(context.Background())
 	if err != nil {
@@ -61,7 +80,11 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ws", websocketHandler(networkMonitor))
-	mux.Handle("/", http.FileServer(http.FS(static)))
+	displays, err := displayHandler(static)
+	if err != nil {
+		log.Fatal(err)
+	}
+	mux.Handle("/", displays)
 
 	addr := "127.0.0.1:8080"
 	log.Printf("OBS Network Monitor: http://%s", addr)

@@ -230,9 +230,11 @@ WebSocketでは次の構造をJSONで配信する。測定成功値がまだな�
 
 UIはOBS Browser Sourceでの利用を前提とする透明なオーバーレイに統一する。クエリなしの `/` の推奨Browser Sourceサイズは、1920 x 1080の配信画面を基準に480 x 480 pxとする。背景、外枠、パネル、カード、全体タイトル、NIC名・状態・リンク速度、測定先、配信状態は表示しない。
 
-OBS向け表示は `LATENCY` と `NIC TRAFFIC` の2セクションで構成する。`sections=latency` は遅延だけを480 x 270 px、`sections=traffic` はNIC通信量だけを480 x 210 pxで表示できる。有効なセクションが指定されていない場合は空画面にせず両方を表示する。
+OBS向け表示は `LATENCY` と `NIC TRAFFIC` の2セクションで構成する。`/latency` は遅延だけを480 x 270 px、`/traffic` はNIC通信量だけを480 x 210 pxで表示し、クエリなしの `/` は両方を480 x 480 pxで表示する。従来の `sections=latency|traffic` は互換性のため `/` で維持し、表示URLが指定するセクションを優先する。未知のパスは404を返す。
 
-数値一覧とグラフは、WebSocket接続を分割せず表示だけを `parts` クエリで切り替える。`parts=values` は数値のみ、`parts=graph` はグラフのみ、`parts=values,graph` または未指定は両方を表示する。有効な値がない場合は両方へフォールバックし、`sections` と併用できる。
+数値一覧とグラフは、各表示URLでWebSocket接続を分割せず表示だけを `parts` クエリで切り替える。`parts=values` は数値のみ、`parts=graph` はグラフのみ、`parts=values,graph` または未指定は両方を表示する。有効な値がない場合は両方へフォールバックする。
+
+各Browser Sourceは共通のWebSocketエンドポイント `/ws` へ個別に接続する。バックエンドのモニター、履歴、最新スナップショットは全接続で共有し、クライアント数によってICMP、HTTP、NICの測定回数を増やさない。WebSocketのJSON契約もページ間で共通とする。
 
 表示項目:
 

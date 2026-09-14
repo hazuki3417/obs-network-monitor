@@ -46,7 +46,7 @@ assert.match(css, /data-parts="values"/, 'values-only styles must exist');
 assert.match(css, /data-parts="graph"/, 'graph-only styles must exist');
 assert.equal((app.match(/new WebSocket/g) || []).length, 1, 'UI parts must share one WebSocket');
 
-function loadUI(search = '') {
+function loadUI(search = '', pathname = '/') {
   const elements = new Map(ids.map((id) => [id, new FakeElement()]));
   const body = new FakeElement();
   const context = {
@@ -62,7 +62,7 @@ function loadUI(search = '') {
         return new FakeElement();
       },
     },
-    location: {host: '127.0.0.1:8080', protocol: 'http:', search},
+    location: {host: '127.0.0.1:8080', pathname, protocol: 'http:', search},
     URLSearchParams,
     WebSocket: class {},
     window: {clearTimeout() {}, setTimeout() {}},
@@ -160,5 +160,16 @@ assert.equal(invalidParts.body.dataset.parts, 'all');
 const combinedOptions = loadUI('?sections=traffic&parts=graph');
 assert.equal(combinedOptions.body.dataset.sections, 'traffic');
 assert.equal(combinedOptions.body.dataset.parts, 'graph');
+
+const latencyPage = loadUI('?parts=values', '/latency');
+assert.equal(latencyPage.body.dataset.sections, 'latency');
+assert.equal(latencyPage.body.dataset.parts, 'values');
+
+const trafficPage = loadUI('?parts=graph', '/traffic');
+assert.equal(trafficPage.body.dataset.sections, 'traffic');
+assert.equal(trafficPage.body.dataset.parts, 'graph');
+
+const pathOverridesLegacyQuery = loadUI('?sections=traffic', '/latency');
+assert.equal(pathOverridesLegacyQuery.body.dataset.sections, 'latency');
 
 console.log('Web UI tests passed.');

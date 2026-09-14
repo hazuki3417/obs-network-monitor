@@ -136,6 +136,16 @@ function Test-RunningMonitor {
             throw "Embedded monitor UI was not returned in scenario '$Name'."
         }
 
+        foreach ($displayPath in @("latency", "traffic")) {
+            $displayResponse = Invoke-WebRequest `
+                -Uri "http://127.0.0.1:8080/$($displayPath)?parts=graph" `
+                -TimeoutSec 2 `
+                -UseBasicParsing
+            if ($displayResponse.StatusCode -ne 200 -or $displayResponse.Content -notmatch "OBS NETWORK MONITOR") {
+                throw "Display endpoint '/$displayPath' was not returned in scenario '$Name'."
+            }
+        }
+
         $firstSnapshot = Receive-MonitorSnapshot
         $secondSnapshot = Receive-MonitorSnapshot
         Assert-MonitorSnapshot $firstSnapshot $ExpectedTargets

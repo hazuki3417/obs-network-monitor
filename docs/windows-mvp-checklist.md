@@ -89,19 +89,20 @@ ICMPを返さない検証用ネットワークまたは測定先を使い、HTTP
 - [ ] シーン再表示後にWebSocketが接続し、最新値へ復帰した
 - [ ] 画面に総合的な回線品質判定や閾値色分けがない
 
-4. URLを `http://127.0.0.1:8080/?sections=latency`、サイズを480 x 270に変更する。
-5. URLを `http://127.0.0.1:8080/?sections=traffic`、サイズを480 x 210に変更する。
+4. URLを `http://127.0.0.1:8080/latency`、サイズを480 x 270に変更する。
+5. URLを `http://127.0.0.1:8080/traffic`、サイズを480 x 210に変更する。
 
-- [ ] `sections=latency` では遅延セクションだけが表示された
-- [ ] `sections=traffic` ではNIC通信量セクションだけが表示された
+- [ ] `/latency` では遅延セクションだけが表示された
+- [ ] `/traffic` ではNIC通信量セクションだけが表示された
+- [ ] 従来の `/?sections=latency` と `/?sections=traffic` も同じ表示になった
 
 6. URLへ `?parts=values`、`?parts=graph`、`?parts=values,graph` を順に指定する。
-7. `?sections=traffic&parts=graph` のように `sections` と併用する。
+7. `/traffic?parts=graph` のように表示URLと併用する。
 
 - [ ] `parts=values` では数値だけが表示された
 - [ ] `parts=graph` ではグラフだけが表示された
 - [ ] `parts=values,graph` と未指定では両方が表示された
-- [ ] `sections` と `parts` の指定が同時に反映された
+- [ ] 表示URLと `parts` の指定が同時に反映された
 - [ ] データ未取得時もグラフ中央に待機テキストが表示されなかった
 
 ## 結果記録
