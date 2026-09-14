@@ -2,55 +2,140 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 
+class FakeContext {
+  constructor() { this.operations = []; }
+  record(name, ...args) { this.operations.push({name, args}); }
+  setTransform(...args) { this.record('setTransform', ...args); }
+  clearRect(...args) { this.record('clearRect', ...args); }
+  beginPath() { this.record('beginPath'); }
+  moveTo(...args) { this.record('moveTo', ...args); }
+  lineTo(...args) { this.record('lineTo', ...args); }
+  bezierCurveTo(...args) { this.record('bezierCurveTo', ...args); }
+  stroke() { this.record('stroke'); }
+  fillText(...args) { this.record('fillText', ...args); }
+  save() { this.record('save'); }
+  restore() { this.record('restore'); }
+  rect(...args) { this.record('rect', ...args); }
+  clip() { this.record('clip'); }
+}
+
 class FakeElement {
-  constructor() {
+  constructor(id = '') {
+    this.id = id;
     this.attributes = {};
-    this.children = [];
+    this.className = '';
     this.dataset = {};
-    this.hidden = false;
     this.textContent = '';
+    this.lastChild = {textContent: ''};
+    this.animations = [];
+    this.listeners = {};
+    this.context = id.endsWith('-canvas') ? new FakeContext() : null;
   }
 
-  append(child) {
-    this.children.push(child);
+  setAttribute(name, value) { this.attributes[name] = value; }
+  addEventListener(name, listener) { this.listeners[name] = listener; }
+  getContext(kind) { assert.equal(kind, '2d'); return this.context; }
+  getBoundingClientRect() {
+    return {width: 464, height: this.id.startsWith('traffic') ? 96 : 104};
   }
-
-  replaceChildren() {
-    this.children = [];
-  }
-
-  setAttribute(name, value) {
-    this.attributes[name] = value;
+  getAnimations() { return this.animations; }
+  animate(keyframes, options) {
+    const animation = {keyframes, options, cancel() {}};
+    this.animations.push(animation);
+    return animation;
   }
 }
 
-const html = fs.readFileSync('web/index.html', 'utf8');
-const css = fs.readFileSync('web/style.css', 'utf8');
-const app = fs.readFileSync('web/app.js', 'utf8');
-const ids = [...html.matchAll(/id="([^"]+)"/g)].map((match) => match[1]);
-assert.equal(new Set(ids).size, ids.length, 'HTML element IDs must be unique');
-assert.doesNotMatch(html, /id="nic-name"/, 'legacy NIC dashboard must not remain');
-assert.doesNotMatch(html, /OBS NETWORK MONITOR/, 'legacy product heading must not remain');
-assert.doesNotMatch(html, /成功した測定を待っています|通信量を測定しています/, 'charts must not contain waiting text');
-assert.match(
-  html,
-  /<span class="label">LATENCY<\/span>\s*<strong id="latency">--<\/strong>\s*<span class="unit">ms<\/span>/,
-  'label, value, and unit must be independent grid items',
-);
-assert.match(html, /id="consecutive-failures">0<\/strong>\s*<span class="unit" aria-hidden="true"><\/span>/);
-assert.match(css, /width: min\(464px, calc\(100vw - 16px\)\)/, 'overlay must fit a 480 px source');
-assert.match(css, /grid-template-columns: minmax\(0, 1fr\) 58px 20px/, 'metric columns must have fixed value and unit widths');
-assert.match(css, /data-sections="latency"/, 'latency-only styles must exist');
-assert.match(css, /data-sections="traffic"/, 'traffic-only styles must exist');
-assert.match(css, /data-parts="values"/, 'values-only styles must exist');
-assert.match(css, /data-parts="graph"/, 'graph-only styles must exist');
-assert.equal((app.match(/new WebSocket/g) || []).length, 1, 'UI parts must share one WebSocket');
+const overlaySharedScripts = [
+  'web/shared/options.js',
+  'web/shared/animation.js',
+  'web/shared/dom.js',
+  'web/shared/chart.js',
+  'web/shared/websocket.js',
+];
+const pages = {
+  home: {
+    html: fs.readFileSync('web/index.html', 'utf8'),
+    scripts: ['web/shared/websocket.js', 'web/app.js'],
+  },
+  latency: {
+    html: fs.readFileSync('web/latency/index.html', 'utf8'),
+    scripts: [...overlaySharedScripts, 'web/latency/view.js', 'web/latency/app.js'],
+  },
+  traffic: {
+    html: fs.readFileSync('web/traffic/index.html', 'utf8'),
+    scripts: [...overlaySharedScripts, 'web/traffic/view.js', 'web/traffic/app.js'],
+  },
+  route: {
+    html: fs.readFileSync('web/route/index.html', 'utf8'),
+    scripts: ['web/shared/websocket.js', 'web/route/view.js', 'web/route/app.js'],
+  },
+};
+const overlayCSS = fs.readFileSync('web/shared/base.css', 'utf8');
+const homeCSS = fs.readFileSync('web/home.css', 'utf8');
 
-function loadUI(search = '') {
-  const elements = new Map(ids.map((id) => [id, new FakeElement()]));
-  const body = new FakeElement();
+for (const [name, page] of Object.entries(pages)) {
+  const ids = [...page.html.matchAll(/id="([^"]+)"/g)].map((match) => match[1]);
+  assert.equal(new Set(ids).size, ids.length, `${name} HTML element IDs must be unique`);
+  const scriptSources = [...page.html.matchAll(/<script src="([^"]+)"/g)].map((match) => match[1]);
+  assert.deepEqual(scriptSources, page.scripts.map((script) => script.replace(/^web/, '')));
+}
+
+assert.match(pages.home.html, /id="service-status"/);
+assert.match(pages.home.html, /id="websocket-status"/);
+assert.match(pages.home.html, /id="stream-status"/);
+assert.match(pages.home.html, /id="shutdown-button"/);
+assert.match(pages.home.html, /id="shutdown-status"/);
+assert.match(pages.home.html, /href="\/latency"/);
+assert.match(pages.home.html, /href="\/traffic"/);
+assert.match(pages.home.html, /href="\/route"/);
+assert.match(pages.home.html, /github\.com\/hazuki3417\/obs-network-monitor/);
+assert.match(pages.home.html, /MIT License/);
+assert.match(pages.home.html, /© 2026/);
+assert.match(pages.home.html, /<ul class="links">/);
+assert.match(pages.home.html, /href="\/latency">http:\/\/127\.0\.0\.1:8080\/latency<\/a>/);
+assert.match(pages.home.html, /<footer>[\s\S]*MIT License[\s\S]*<\/footer>/);
+assert.doesNotMatch(pages.home.html, /latency-chart-canvas|traffic-chart-canvas/);
+assert.match(pages.latency.html, /id="latency-chart-canvas"/);
+assert.doesNotMatch(pages.latency.html, /id="traffic-chart-canvas"/);
+assert.match(pages.traffic.html, /id="traffic-chart-canvas"/);
+assert.doesNotMatch(pages.traffic.html, /id="latency-chart-canvas"/);
+assert.match(pages.route.html, /id="route-nodes"/);
+assert.doesNotMatch(pages.route.html, /chart-canvas|parts=/);
+assert.match(overlayCSS, /data-parts="values"/);
+assert.match(overlayCSS, /data-parts="graph"/);
+assert.match(homeCSS, /grid-template-columns: minmax\(0, 1fr\) 160px/);
+
+function loadPage(page, search = '') {
+  const ids = [...page.html.matchAll(/id="([^"]+)"/g)].map((match) => match[1]);
+  const elements = new Map(ids.map((id) => [id, new FakeElement(id)]));
+  const body = new FakeElement('body');
+  const sockets = [];
+  const frames = [];
+  let frameId = 0;
+  let clock = 0;
+  class FakeWebSocket {
+    constructor(url) { this.url = url; sockets.push(this); }
+    close() {}
+  }
+  const window = {
+    clearTimeout() {},
+    setTimeout() {},
+    devicePixelRatio: 2,
+    performance: {now: () => clock},
+    requestAnimationFrame(callback) {
+      frameId += 1;
+      frames.push({id: frameId, callback});
+      return frameId;
+    },
+    cancelAnimationFrame(id) {
+      const index = frames.findIndex((frame) => frame.id === id);
+      if (index >= 0) frames.splice(index, 1);
+    },
+  };
   const context = {
     console,
+    Date,
     document: {
       body,
       querySelector(selector) {
@@ -58,37 +143,28 @@ function loadUI(search = '') {
         assert.ok(element, `missing HTML element for ${selector}`);
         return element;
       },
-      createElementNS() {
-        return new FakeElement();
-      },
     },
     location: {host: '127.0.0.1:8080', protocol: 'http:', search},
     URLSearchParams,
-    WebSocket: class {},
-    window: {clearTimeout() {}, setTimeout() {}},
+    WebSocket: FakeWebSocket,
+    window,
   };
-  vm.runInNewContext(app, context);
-  return {body, context, elements};
+  for (const script of page.scripts) {
+    vm.runInNewContext(fs.readFileSync(script, 'utf8'), context, {filename: script});
+  }
+  function runFrame(time) {
+    clock = time;
+    const pending = frames.shift();
+    assert.ok(pending, 'an animation frame must be scheduled');
+    pending.callback(time);
+  }
+  return {body, elements, frames, runFrame, sockets};
 }
 
-const {body, context, elements} = loadUI();
-assert.equal(
-  context.monotonePath([{x: 0, y: 10}, {x: 1, y: 0}, {x: 2, y: 10}]),
-  'M 0.00 10.00 C 0.33 6.67 0.67 0.00 1.00 0.00 C 1.33 0.00 1.67 6.67 2.00 10.00',
-  'smooth path controls must stay within the adjacent sample range',
-);
-context.renderSnapshot({
-  nic: {
-    name: 'Ethernet',
-    description: 'Test adapter',
-    state: 'connected',
-    transmitLinkSpeedBps: 1_000_000_000,
-    receiveLinkSpeedBps: 1_000_000_000,
-  },
+const snapshot = {
+  generatedAt: '2026-09-14T12:00:05.000Z',
   traffic: {transmitBps: 0, receiveBps: 1_500_000},
   statistics: {
-    method: 'icmp',
-    target: '8.8.8.8',
     latestLatencyMs: 20,
     averageLatencyMs: 15.5,
     minimumLatencyMs: 10,
@@ -99,66 +175,199 @@ context.renderSnapshot({
     consecutiveFailures: 0,
   },
   history: [
-    {success: true, rttMs: 10},
-    {success: true, rttMs: 15},
-    {success: false, rttMs: 0},
-    {success: true, rttMs: 20},
-    {success: true, rttMs: 25},
+    {checkedAt: '2026-09-14T12:00:01.000Z', success: true, rttMs: 10},
+    {checkedAt: '2026-09-14T12:00:02.000Z', success: true, rttMs: 15},
   ],
   trafficHistory: [
-    {transmitBps: null, receiveBps: null},
-    {transmitBps: 0, receiveBps: 1_000_000},
-    {transmitBps: 500_000, receiveBps: 1_500_000},
+    {checkedAt: '2026-09-14T12:00:04.000Z', transmitBps: 0, receiveBps: 1_000_000},
+    {checkedAt: '2026-09-14T12:00:05.000Z', transmitBps: 500_000, receiveBps: 1_500_000},
   ],
-  generatedAt: '2026-09-13T03:00:00Z',
-});
+  route: {
+    status: 'complete',
+    checkedAt: '2026-09-14T12:00:00.000Z',
+    hopCount: 8,
+    maxNodes: 6,
+    hops: [
+      {number: 1, responded: true, rttMs: 2, deltaRttMs: null, target: false},
+      {number: 2, responded: true, rttMs: 4, deltaRttMs: 2, target: false},
+      {number: 3, responded: true, rttMs: 30, deltaRttMs: 26, target: false},
+      {number: 4, responded: true, rttMs: 55, deltaRttMs: 25, target: false},
+      {number: 5, responded: true, rttMs: 80, deltaRttMs: 25, target: false},
+      {number: 6, responded: false, rttMs: null, deltaRttMs: null, target: false},
+      {number: 7, responded: true, rttMs: 82, deltaRttMs: null, target: false},
+      {number: 8, responded: true, rttMs: 84, deltaRttMs: 2, target: true},
+    ],
+  },
+};
 
-assert.equal(elements.get('tx-traffic').textContent, '0 bps');
-assert.equal(elements.get('rx-traffic').textContent, '1.5 Mbps');
-assert.equal(elements.get('average-latency').textContent, '15.5');
-assert.equal(elements.get('minimum-latency').textContent, '10');
-assert.equal(elements.get('maximum-latency').textContent, '20');
-assert.equal(elements.get('consecutive-failures').textContent, 0);
-assert.match(elements.get('latency-path').attributes.d, /^M .* C .* M .* C /, 'failed sample must split smooth curves');
-assert.match(elements.get('traffic-transmit-path').attributes.d, / C /, 'traffic path must be smooth');
-assert.match(elements.get('traffic-receive-path').attributes.d, / C /, 'traffic path must be smooth');
-assert.equal(elements.get('latency-axis-maximum').textContent, '50');
-assert.equal(elements.get('latency-axis-middle').textContent, '25');
-assert.equal(elements.get('latency-overlay-maximum').textContent, '50 ms');
-assert.equal(elements.get('traffic-axis-maximum').textContent, '2');
-assert.equal(elements.get('traffic-axis-middle').textContent, '1');
-assert.equal(elements.get('traffic-overlay-maximum').textContent, '2 Mbps');
-assert.equal(body.dataset.sections, 'all');
-assert.equal(body.dataset.parts, 'all');
-assert.match(html, /id="latency-chart-svg" viewBox="-36 0 516 112"/);
-assert.match(html, /id="traffic-chart-svg" viewBox="-36 0 516 96"/);
+const home = loadPage(pages.home);
+assert.equal(typeof home.elements.get('shutdown-button').listeners.click, 'function');
+assert.equal(home.sockets.length, 1, 'home health check must connect to WebSocket');
+assert.equal(home.sockets[0].url, 'ws://127.0.0.1:8080/ws');
+assert.equal(home.elements.get('websocket-status').lastChild.textContent, 'Connecting');
+home.sockets[0].onopen();
+assert.equal(home.elements.get('websocket-status').lastChild.textContent, 'Connected');
+assert.equal(home.elements.get('websocket-status').className, 'status is-healthy');
+home.sockets[0].onmessage({data: JSON.stringify(snapshot)});
+assert.equal(home.elements.get('stream-status').lastChild.textContent, 'Receiving data');
+assert.notEqual(home.elements.get('last-update').textContent, '--');
+home.sockets[0].onclose();
+assert.equal(home.elements.get('websocket-status').lastChild.textContent, 'Reconnecting');
+assert.equal(home.elements.get('stream-status').lastChild.textContent, 'Waiting for data');
 
-const latencyOnly = loadUI('?sections=latency');
-assert.equal(latencyOnly.body.dataset.sections, 'latency');
+const route = loadPage(pages.route);
+assert.equal(route.sockets.length, 1, 'route view must share the WebSocket endpoint');
+route.sockets[0].onmessage({data: JSON.stringify({
+  ...snapshot,
+  route: {
+    ...snapshot.route,
+    hops: snapshot.route.hops.map((hop) => ({
+      ...hop,
+      address: `192.0.2.${hop.number}`,
+      hostname: `router-${hop.number}.example.test`,
+    })),
+  },
+})});
+const routeHTML = route.elements.get('route-nodes').innerHTML;
+assert.match(routeHTML, /LOCAL/);
+assert.match(routeHTML, /TARGET/);
+assert.match(routeHTML, /MULTIPLE LATENCY JUMPS/);
+assert.doesNotMatch(routeHTML, /192\.0\.2|example\.test/);
+assert.ok(
+  (routeHTML.match(/<li/g) || []).length <= 6,
+  'route view must not exceed maxNodes',
+);
 
-const trafficOnly = loadUI('?sections=traffic');
-assert.equal(trafficOnly.body.dataset.sections, 'traffic');
+route.sockets[0].onmessage({data: JSON.stringify({
+  ...snapshot,
+  route: {
+    ...snapshot.route,
+    hopCount: 3,
+    hops: [
+      {number: 1, responded: true, rttMs: 2, deltaRttMs: null, target: false},
+      {number: 2, responded: false, rttMs: null, deltaRttMs: null, target: false},
+      {number: 3, responded: true, rttMs: 10, deltaRttMs: null, target: true},
+    ],
+  },
+})});
+assert.match(route.elements.get('route-nodes').innerHTML, /NO RESPONSE/);
 
-const invalidSections = loadUI('?sections=unknown');
-assert.equal(invalidSections.body.dataset.sections, 'all');
+route.sockets[0].onmessage({data: JSON.stringify({
+  ...snapshot,
+  route: {...snapshot.route, status: 'incomplete', hops: snapshot.route.hops.slice(0, 4)},
+})});
+assert.match(route.elements.get('route-nodes').innerHTML, /ROUTE INCOMPLETE/);
 
-const legacyOverlayURL = loadUI('?view=overlay');
-assert.equal(legacyOverlayURL.body.dataset.sections, 'all');
+const latency = loadPage(pages.latency, '?parts=values');
+assert.equal(latency.sockets.length, 1);
+assert.equal(latency.body.dataset.parts, 'values');
+assert.equal(latency.frames.length, 0, 'values-only view must not render Canvas');
+latency.sockets[0].onmessage({data: JSON.stringify(snapshot)});
+assert.equal(latency.elements.get('latency').textContent, '20');
+assert.equal(
+  latency.elements.get('latency').animations.length,
+  0,
+  'value updates must not use a flashing animation',
+);
 
-const valuesOnly = loadUI('?parts=values');
-assert.equal(valuesOnly.body.dataset.parts, 'values');
+const traffic = loadPage(pages.traffic, '?parts=graph');
+assert.equal(traffic.sockets.length, 1);
+assert.equal(traffic.body.dataset.parts, 'graph');
+assert.equal(traffic.frames.length, 1);
+traffic.sockets[0].onmessage({data: JSON.stringify({
+  ...snapshot,
+  trafficHistory: Array.from({length: 5}, (_, index) => ({
+    checkedAt: `2026-09-14T12:00:0${index + 1}.000Z`,
+    transmitBps: index * 250_000,
+    receiveBps: (index + 1) * 300_000,
+  })),
+})});
+assert.equal(traffic.elements.get('rx-traffic').textContent, '');
+traffic.runFrame(17);
+const trafficOperations = traffic.elements.get('traffic-chart-canvas').context.operations;
+assert.ok(trafficOperations.some(
+  (operation) => operation.name === 'bezierCurveTo',
+));
+assert.ok(trafficOperations.some(
+  (operation) => operation.name === 'bezierCurveTo'
+    && operation.args[4] > 516,
+), 'received samples must be rendered in the hidden right overscan area');
+assert.equal(trafficOperations.some(
+  (operation) => operation.name === 'bezierCurveTo'
+    && operation.args[4] === 516,
+), false, 'the visible right edge must not use a synthetic horizontal extension');
+assert.ok(trafficOperations.some(
+  (operation) => operation.name === 'rect'
+    && operation.args[0] === 28
+    && operation.args[1] === 1
+    && operation.args[2] === 488
+    && operation.args[3] === 94,
+), 'graph lines must be clipped at a fixed left boundary');
+assert.equal(
+  trafficOperations.filter((operation) => operation.name === 'lineTo'
+    && operation.args[0] === 28).length,
+  0,
+  'the fixed clipping boundary must remain invisible',
+);
 
-const graphOnly = loadUI('?parts=graph');
-assert.equal(graphOnly.body.dataset.parts, 'graph');
+const trafficWithRenderBuffer = loadPage(pages.traffic, '?parts=graph');
+const bufferedAt = Date.parse('2026-09-14T12:01:03.000Z');
+trafficWithRenderBuffer.sockets[0].onmessage({data: JSON.stringify({
+  ...snapshot,
+  generatedAt: new Date(bufferedAt).toISOString(),
+  trafficHistory: Array.from({length: 74}, (_, index) => ({
+    checkedAt: new Date(bufferedAt - (73 - index) * 900).toISOString(),
+    transmitBps: index * 1000,
+    receiveBps: index * 2000,
+  })),
+})});
+trafficWithRenderBuffer.runFrame(17);
+assert.ok(
+  trafficWithRenderBuffer.elements.get('traffic-chart-canvas').context.operations.some(
+    (operation) => operation.name === 'moveTo' && operation.args[0] < 28,
+  ),
+  'render history must retain more than 60 seconds when intervals are short',
+);
 
-const allParts = loadUI('?parts=values,graph');
+const trafficWithStableClock = loadPage(pages.traffic, '?parts=graph');
+const stableTrafficHistory = Array.from({length: 5}, (_, index) => ({
+  checkedAt: `2026-09-14T12:00:0${index + 1}.000Z`,
+  transmitBps: index * 250_000,
+  receiveBps: (index + 1) * 300_000,
+}));
+trafficWithStableClock.sockets[0].onmessage({data: JSON.stringify({
+  ...snapshot,
+  trafficHistory: stableTrafficHistory,
+})});
+trafficWithStableClock.runFrame(1000);
+const firstFrameOperations = trafficWithStableClock.elements
+  .get('traffic-chart-canvas').context.operations;
+const firstFrameSeriesX = firstFrameOperations.filter(
+  (operation) => operation.name === 'moveTo' && operation.args[0] !== 28,
+).at(-1).args[0];
+const operationsBeforeUpdate = firstFrameOperations.length;
+trafficWithStableClock.sockets[0].onmessage({data: JSON.stringify({
+  ...snapshot,
+  generatedAt: '2026-09-14T12:00:08.000Z',
+  trafficHistory: [
+    stableTrafficHistory[0],
+    stableTrafficHistory[stableTrafficHistory.length - 1],
+    {checkedAt: '2026-09-14T12:00:08.000Z', transmitBps: 750_000, receiveBps: 1_750_000},
+  ],
+})});
+trafficWithStableClock.runFrame(1017);
+const secondFrameSeriesX = firstFrameOperations.slice(operationsBeforeUpdate).filter(
+  (operation) => operation.name === 'moveTo' && operation.args[0] !== 28,
+).at(-1).args[0];
+assert.ok(
+  firstFrameSeriesX - secondFrameSeriesX > 0
+    && firstFrameSeriesX - secondFrameSeriesX < 0.2,
+  'pruning overlapping history must not reset or move the rendering clock',
+);
+
+const allParts = loadPage(pages.traffic, '?parts=values,graph');
 assert.equal(allParts.body.dataset.parts, 'all');
-
-const invalidParts = loadUI('?parts=unknown');
+const invalidParts = loadPage(pages.latency, '?parts=unknown');
 assert.equal(invalidParts.body.dataset.parts, 'all');
-
-const combinedOptions = loadUI('?sections=traffic&parts=graph');
-assert.equal(combinedOptions.body.dataset.sections, 'traffic');
-assert.equal(combinedOptions.body.dataset.parts, 'graph');
 
 console.log('Web UI tests passed.');

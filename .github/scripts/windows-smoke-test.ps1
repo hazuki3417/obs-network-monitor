@@ -87,6 +87,25 @@ function Assert-MonitorSnapshot {
     if ($null -eq $Snapshot.generatedAt) {
         throw "Snapshot does not contain generatedAt."
     }
+    if ($null -eq $Snapshot.route) {
+        throw "Snapshot does not contain route information."
+    }
+    $routeProperties = $Snapshot.route.PSObject.Properties.Name
+    foreach ($property in @("status", "checkedAt", "hopCount", "maxNodes", "hops")) {
+        if ($routeProperties -notcontains $property) {
+            throw "Snapshot route does not contain $property."
+        }
+    }
+    if (@("measuring", "complete", "incomplete", "unavailable") -notcontains $Snapshot.route.status) {
+        throw "Unexpected route status: $($Snapshot.route.status)"
+    }
+    if ($Snapshot.route.maxNodes -ne 6) {
+        throw "Unexpected route maxNodes: $($Snapshot.route.maxNodes)"
+    }
+    $serializedRoute = $Snapshot.route | ConvertTo-Json -Depth 8 -Compress
+    if ($serializedRoute -match '"address"' -or $serializedRoute -match '"hostname"') {
+        throw "Route exposes an address or hostname: $serializedRoute"
+    }
 }
 
 function Test-RunningMonitor {
@@ -132,14 +151,50 @@ function Test-RunningMonitor {
         if ($null -eq $response -or $response.StatusCode -ne 200) {
             throw "Monitor HTTP endpoint did not become ready in scenario '$Name'."
         }
-        if ($response.Content -notmatch "OBS NETWORK MONITOR") {
-            throw "Embedded monitor UI was not returned in scenario '$Name'."
+        if ($response.Content -notmatch "service-status" -or $response.Content -match "chart-canvas") {
+            throw "Monitor status page was not returned in scenario '$Name'."
+        }
+
+        $displayPages = @(
+            @{ Path = "latency"; Present = "latency-chart-canvas"; Absent = "traffic-chart-canvas" },
+            @{ Path = "traffic"; Present = "traffic-chart-canvas"; Absent = "latency-chart-canvas" },
+            @{ Path = "route"; Present = "route-nodes"; Absent = "chart-canvas" }
+        )
+        foreach ($displayPage in $displayPages) {
+            $displayResponse = Invoke-WebRequest `
+                -Uri "http://127.0.0.1:8080/$($displayPage.Path)?parts=graph" `
+                -TimeoutSec 2 `
+                -UseBasicParsing
+            if ($displayResponse.StatusCode -ne 200 `
+                -or $displayResponse.Content -notmatch $displayPage.Present `
+                -or $displayResponse.Content -match $displayPage.Absent) {
+                throw "Display endpoint '/$($displayPage.Path)' returned unexpected content in scenario '$Name'."
+            }
         }
 
         $firstSnapshot = Receive-MonitorSnapshot
         $secondSnapshot = Receive-MonitorSnapshot
         Assert-MonitorSnapshot $firstSnapshot $ExpectedTargets
         Assert-MonitorSnapshot $secondSnapshot $ExpectedTargets
+
+        $shutdownResponse = Invoke-WebRequest `
+            -Uri "http://127.0.0.1:8080/api/shutdown" `
+            -Method Post `
+            -Headers @{
+                "Origin" = "http://127.0.0.1:8080"
+                "X-OBS-Network-Monitor-Shutdown" = "1"
+            } `
+            -TimeoutSec 5 `
+            -UseBasicParsing
+        if ($shutdownResponse.StatusCode -ne 202) {
+            throw "Shutdown endpoint returned $($shutdownResponse.StatusCode) in scenario '$Name'."
+        }
+        if (-not $process.WaitForExit(10000)) {
+            throw "Monitor did not stop gracefully in scenario '$Name'."
+        }
+        if ($process.ExitCode -ne 0) {
+            throw "Monitor exited with code $($process.ExitCode) after shutdown in scenario '$Name'."
+        }
     }
     finally {
         Stop-MonitorProcess $process
@@ -169,7 +224,11 @@ function Test-InvalidConfiguration {
         if ($process.ExitCode -eq 0) {
             throw "Monitor accepted an invalid configuration."
         }
-        $errorLog = Get-Content $standardError -Raw
+        $errorLogPath = Join-Path $scenarioDirectory "logs/error.log"
+        if (-not (Test-Path $errorLogPath)) {
+            throw "Invalid configuration did not create logs/error.log."
+        }
+        $errorLog = Get-Content $errorLogPath -Raw
         if ($errorLog -notmatch "load config") {
             throw "Invalid configuration error was not logged: $errorLog"
         }
@@ -185,7 +244,7 @@ try {
         -ConfigContent $null `
         -ExpectedTargets @("8.8.8.8", "https://www.google.com/generate_204")
 
-    $validConfig = '{"icmpTarget":"1.1.1.1","httpTarget":"https://example.com/"}'
+    $validConfig = '{"icmpTarget":"1.1.1.1","httpTarget":"https://example.com/","traceroute":{"intervalSeconds":60,"maxNodes":6}}'
     Test-RunningMonitor `
         -Name "valid-config" `
         -ConfigContent $validConfig `

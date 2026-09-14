@@ -1,4 +1,9 @@
 {
   "icmpTarget": "8.8.8.8",
-  "httpTarget": "https://www.google.com/generate_204"
+  "httpTarget": "https://www.google.com/generate_204",
+  "traceroute": {
+    "target": "",
+    "intervalSeconds": 60,
+    "maxNodes": 6
+  }
 }

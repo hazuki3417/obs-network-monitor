@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Latency | OBS Network Monitor</title>
+  <link rel="stylesheet" href="/shared/base.css">
+</head>
+<body data-page="latency">
+  <main class="panel" id="monitor-panel">
+    <h2 class="section-title latency-title">LATENCY</h2>
+
+    <section class="metrics" id="latency-metrics" aria-label="回線測定値">
+      <div class="metric">
+        <span class="label">LATENCY</span>
+        <strong id="latency">--</strong>
+        <span class="unit">ms</span>
+      </div>
+      <div class="metric">
+        <span class="label">JITTER</span>
+        <strong id="jitter">--</strong>
+        <span class="unit">ms</span>
+      </div>
+      <div class="metric">
+        <span class="label" id="failure-label">PACKET LOSS</span>
+        <strong id="failure-rate">--</strong>
+        <span class="unit">%</span>
+      </div>
+      <div class="metric">
+        <span class="label">FAIL STREAK</span>
+        <strong id="consecutive-failures">0</strong>
+        <span class="unit" aria-hidden="true"></span>
+      </div>
+    </section>
+
+    <section class="latency-summary" id="latency-summary" aria-label="直近60回の遅延統計">
+      <div>
+        <span class="label">AVG LATENCY</span>
+        <strong id="average-latency">--</strong>
+        <span class="unit">ms</span>
+      </div>
+      <div>
+        <span class="label">MIN LATENCY</span>
+        <strong id="minimum-latency">--</strong>
+        <span class="unit">ms</span>
+      </div>
+      <div>
+        <span class="label">MAX LATENCY</span>
+        <strong id="maximum-latency">--</strong>
+        <span class="unit">ms</span>
+      </div>
+    </section>
+
+    <section class="chart-card latency-chart-card" id="latency-chart" aria-label="遅延グラフ">
+      <canvas class="chart" id="latency-chart-canvas" width="516" height="112" role="img" aria-label="直近60秒の遅延グラフ"></canvas>
+    </section>
+  </main>
+  <script src="/shared/options.js"></script>
+  <script src="/shared/animation.js"></script>
+  <script src="/shared/dom.js"></script>
+  <script src="/shared/chart.js"></script>
+  <script src="/shared/websocket.js"></script>
+  <script src="/latency/view.js"></script>
+  <script src="/latency/app.js"></script>
+</body>
+</html>

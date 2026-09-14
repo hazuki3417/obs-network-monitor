@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>NIC Traffic | OBS Network Monitor</title>
+  <link rel="stylesheet" href="/shared/base.css">
+</head>
+<body data-page="traffic">
+  <main class="panel" id="monitor-panel">
+    <h2 class="section-title traffic-title">NIC TRAFFIC</h2>
+
+    <section class="chart-card traffic-card" id="traffic-section" aria-label="NIC通信量">
+      <div class="traffic-current">
+        <div>
+          <span class="traffic-key transmit" aria-hidden="true"></span>
+          <span class="label">UPLOAD</span>
+          <strong id="tx-traffic">--</strong>
+        </div>
+        <div>
+          <span class="traffic-key receive" aria-hidden="true"></span>
+          <span class="label">DOWNLOAD</span>
+          <strong id="rx-traffic">--</strong>
+        </div>
+      </div>
+      <canvas class="chart traffic-chart" id="traffic-chart-canvas" width="516" height="96" role="img" aria-label="直近60秒のNIC送受信速度グラフ"></canvas>
+    </section>
+  </main>
+  <script src="/shared/options.js"></script>
+  <script src="/shared/animation.js"></script>
+  <script src="/shared/dom.js"></script>
+  <script src="/shared/chart.js"></script>
+  <script src="/shared/websocket.js"></script>
+  <script src="/traffic/view.js"></script>
+  <script src="/traffic/app.js"></script>
+</body>
+</html>

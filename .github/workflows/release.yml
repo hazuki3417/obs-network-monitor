@@ -109,7 +109,7 @@ jobs:
           New-Item -ItemType Directory -Force dist | Out-Null
           $env:GOOS = "windows"
           $env:GOARCH = "amd64"
-          go build -trimpath -o dist/obs-network-monitor.exe .
+          go build -trimpath -ldflags="-H=windowsgui" -o dist/obs-network-monitor.exe .
           if (-not (Test-Path dist/obs-network-monitor.exe)) {
             throw "Windows executable was not created."
           }
@@ -129,6 +129,7 @@ jobs:
           Copy-Item dist/obs-network-monitor.exe $package/
           Copy-Item config.example.json $package/
           Copy-Item README.md $package/
+          Copy-Item LICENSE $package/
           Compress-Archive -Path "$package/*" -DestinationPath $archive
 
           $hash = (Get-FileHash -Path $archive -Algorithm SHA256).Hash.ToLowerInvariant()

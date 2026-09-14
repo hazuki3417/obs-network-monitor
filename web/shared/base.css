@@ -43,14 +43,14 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-body[data-sections="latency"] .panel {
+body[data-page="latency"] .panel {
   grid-template-areas:
     "latency-title latency-title"
     "latency-current latency-summary"
     "latency-chart latency-chart";
 }
 
-body[data-sections="traffic"] .panel {
+body[data-page="traffic"] .panel {
   grid-template-areas:
     "traffic-title traffic-title"
     "traffic traffic";
@@ -72,6 +72,10 @@ body[data-sections="traffic"] .panel {
 .traffic-title {
   grid-area: traffic-title;
   margin-top: 18px;
+}
+
+body[data-page="traffic"] .traffic-title {
+  margin-top: 0;
 }
 
 .metrics {
@@ -144,26 +148,6 @@ body[data-sections="traffic"] .panel {
   width: 100%;
   height: 104px;
   margin: 0;
-  overflow: visible;
-}
-
-.grid-line {
-  stroke: var(--line);
-  stroke-width: 1;
-  vector-effect: non-scaling-stroke;
-}
-
-#latency-path,
-.traffic-path {
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 2;
-  vector-effect: non-scaling-stroke;
-}
-
-#latency-path {
-  stroke: var(--accent);
 }
 
 .traffic-card {
@@ -214,33 +198,8 @@ body[data-sections="traffic"] .panel {
   background: var(--accent);
 }
 
-.traffic-path {
-  stroke: currentColor;
-  background: none;
-}
-
 .traffic-chart {
   height: 96px;
-}
-
-.axis-label,
-.axis-maximum {
-  fill: var(--muted);
-  font-size: 9px;
-  font-weight: 700;
-}
-
-.axis-maximum {
-  font-size: 8px;
-}
-
-body[data-sections="latency"] .traffic-title,
-body[data-sections="latency"] .traffic-card,
-body[data-sections="traffic"] .latency-title,
-body[data-sections="traffic"] .metrics,
-body[data-sections="traffic"] .latency-summary,
-body[data-sections="traffic"] .latency-chart-card {
-  display: none;
 }
 
 body[data-parts="values"] .latency-chart-card,

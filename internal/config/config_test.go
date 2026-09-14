@@ -28,6 +28,7 @@ func TestDefault(t *testing.T) {
 	want := Config{
 		ICMPTarget: "8.8.8.8",
 		HTTPTarget: "https://www.google.com/generate_204",
+		Traceroute: Traceroute{IntervalSeconds: 60, MaxNodes: 6},
 	}
 	if got := Default(); got != want {
 		t.Fatalf("Default() = %#v, want %#v", got, want)
@@ -54,9 +55,43 @@ func TestLoadOverridesTargets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Load() error = %v", err)
 	}
-	want := Config{ICMPTarget: "1.1.1.1", HTTPTarget: "https://example.com/health"}
+	want := Config{
+		ICMPTarget: "1.1.1.1",
+		HTTPTarget: "https://example.com/health",
+		Traceroute: Traceroute{IntervalSeconds: 60, MaxNodes: 6},
+	}
 	if got != want {
 		t.Fatalf("Load() = %#v, want %#v", got, want)
+	}
+}
+
+func TestLoadTracerouteOptions(t *testing.T) {
+	path := writeConfig(t, `{
+		"traceroute": {
+			"target": "1.1.1.1",
+			"intervalSeconds": 30,
+			"maxNodes": 8
+		}
+	}`)
+
+	got, err := Load(context.Background(), path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if got.TracerouteTarget() != "1.1.1.1" || got.Traceroute.IntervalSeconds != 30 || got.Traceroute.MaxNodes != 8 {
+		t.Fatalf("Traceroute = %#v", got.Traceroute)
+	}
+}
+
+func TestTracerouteTargetInheritsICMPTarget(t *testing.T) {
+	path := writeConfig(t, `{"icmpTarget":"1.1.1.1"}`)
+
+	got, err := Load(context.Background(), path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if got.TracerouteTarget() != "1.1.1.1" {
+		t.Fatalf("TracerouteTarget() = %q, want inherited ICMP target", got.TracerouteTarget())
 	}
 }
 
@@ -121,6 +156,11 @@ func TestLoadRejectsInvalidConfig(t *testing.T) {
 		{name: "HTTP scheme", content: `{"httpTarget":"http://example.com"}`, want: "https"},
 		{name: "HTTP without host", content: `{"httpTarget":"https:///health"}`, want: "host"},
 		{name: "HTTP user info", content: `{"httpTarget":"https://user@example.com/health"}`, want: "user information"},
+		{name: "IPv6 traceroute target", content: `{"traceroute":{"target":"2001:db8::1"}}`, want: "traceroute.target"},
+		{name: "short traceroute interval", content: `{"traceroute":{"intervalSeconds":29}}`, want: "intervalSeconds"},
+		{name: "long traceroute interval", content: `{"traceroute":{"intervalSeconds":3601}}`, want: "intervalSeconds"},
+		{name: "few traceroute nodes", content: `{"traceroute":{"maxNodes":2}}`, want: "maxNodes"},
+		{name: "many traceroute nodes", content: `{"traceroute":{"maxNodes":13}}`, want: "maxNodes"},
 	}
 
 	for _, test := range tests {

@@ -1,6 +1,7 @@
 package monitor
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -9,6 +10,7 @@ import (
 
 	"obs-network-monitor/internal/adapter"
 	"obs-network-monitor/internal/probe"
+	"obs-network-monitor/internal/traceroute"
 )
 
 func sample(method probe.Method, success bool, rtt int64) probe.Result {
@@ -33,6 +35,49 @@ func TestHistoryWindowKeepsLatestSixtySamples(t *testing.T) {
 	}
 	if samples[0].RTTMillis != 5 || samples[59].RTTMillis != 64 {
 		t.Fatalf("RTT range = %d...%d, want 5...64", samples[0].RTTMillis, samples[59].RTTMillis)
+	}
+}
+
+func TestStatisticsUseLatestSixtySamplesFromRenderBuffer(t *testing.T) {
+	window := historyWindow{limit: DefaultHistoryLimit}
+	firstStatisticsIndex := DefaultHistoryLimit - StatisticsHistoryLimit
+	for index := 0; index < DefaultHistoryLimit; index++ {
+		window.Add(sample(probe.MethodICMP, index >= firstStatisticsIndex, int64(index)))
+	}
+
+	if len(window.Samples()) != DefaultHistoryLimit {
+		t.Fatalf("sample count = %d, want %d", len(window.Samples()), DefaultHistoryLimit)
+	}
+	statistics := window.Statistics()
+	if statistics.FailureRatePercent != 0 {
+		t.Fatalf("failure rate = %v, want 0", statistics.FailureRatePercent)
+	}
+	if statistics.MinimumLatencyMS == nil || *statistics.MinimumLatencyMS != int64(firstStatisticsIndex) {
+		t.Fatalf("minimum latency = %v, want %d", statistics.MinimumLatencyMS, firstStatisticsIndex)
+	}
+}
+
+func TestHistoryWindowsRetainSixtyFiveSecondsAcrossShortIntervals(t *testing.T) {
+	latency := historyWindow{limit: DefaultHistoryLimit, retention: DefaultHistoryRetention}
+	traffic := trafficWindow{limit: DefaultHistoryLimit, retention: DefaultHistoryRetention}
+	start := time.Date(2026, 9, 14, 12, 0, 0, 0, time.UTC)
+	for index := 0; index < 150; index++ {
+		checkedAt := start.Add(time.Duration(index) * 500 * time.Millisecond)
+		result := sample(probe.MethodICMP, true, int64(index))
+		result.CheckedAt = checkedAt
+		latency.Add(result)
+		traffic.Add(TrafficSample{CheckedAt: checkedAt}, false)
+	}
+
+	latencySamples := latency.Samples()
+	trafficSamples := traffic.Samples()
+	latencySpan := latencySamples[len(latencySamples)-1].CheckedAt.Sub(latencySamples[0].CheckedAt)
+	trafficSpan := trafficSamples[len(trafficSamples)-1].CheckedAt.Sub(trafficSamples[0].CheckedAt)
+	if latencySpan < DefaultHistoryRetention || trafficSpan < DefaultHistoryRetention {
+		t.Fatalf("retained spans = %v and %v, want at least %v", latencySpan, trafficSpan, DefaultHistoryRetention)
+	}
+	if len(latencySamples) <= 64 || len(trafficSamples) <= 64 {
+		t.Fatalf("sample counts = %d and %d, want more than 64", len(latencySamples), len(trafficSamples))
 	}
 }
 
@@ -193,6 +238,12 @@ func TestSnapshotJSONContainsNullableStatisticsAndHistory(t *testing.T) {
 		},
 		History:        []probe.Result{sample(probe.MethodICMP, false, 0)},
 		TrafficHistory: []TrafficSample{{CheckedAt: time.Date(2026, 9, 12, 10, 0, 1, 0, time.UTC)}},
+		Route: Route{
+			Status:   RouteStatusComplete,
+			HopCount: 1,
+			MaxNodes: 6,
+			Hops:     []RouteHop{{Number: 1, Responded: true, Target: true}},
+		},
 		GeneratedAt:    time.Date(2026, 9, 12, 10, 0, 1, 0, time.UTC),
 	}
 
@@ -221,8 +272,85 @@ func TestSnapshotJSONContainsNullableStatisticsAndHistory(t *testing.T) {
 	}
 	history := decoded["history"].([]any)
 	trafficHistory := decoded["trafficHistory"].([]any)
-	if len(history) != 1 || len(trafficHistory) != 1 || decoded["nic"] == nil || decoded["generatedAt"] == nil {
+	if len(history) != 1 || len(trafficHistory) != 1 || decoded["nic"] == nil ||
+		decoded["route"] == nil || decoded["generatedAt"] == nil {
 		t.Fatalf("snapshot JSON = %s", payload)
+	}
+}
+
+func TestSanitizedRouteHidesAddressesAndUsesAdjacentRespondingHops(t *testing.T) {
+	checkedAt := time.Date(2026, 9, 14, 12, 0, 0, 0, time.UTC)
+	route := sanitizedRoute(traceroute.Result{
+		Complete: true,
+		Hops: []traceroute.Hop{
+			{Number: 1, Address: "192.168.1.1", Responded: true, RTT: 2 * time.Millisecond},
+			{Number: 2, Address: "192.0.2.10", Responded: true, RTT: 28 * time.Millisecond},
+			{Number: 3, Responded: false},
+			{Number: 4, Address: "203.0.113.20", Responded: true, RTT: 60 * time.Millisecond},
+			{Number: 5, Address: "8.8.8.8", Responded: true, RTT: 64 * time.Millisecond, Target: true},
+		},
+	}, nil, 6, checkedAt)
+
+	if route.Status != RouteStatusComplete || route.HopCount != 5 || route.MaxNodes != 6 {
+		t.Fatalf("route metadata = %#v", route)
+	}
+	if route.Hops[1].DeltaRTTMS == nil || *route.Hops[1].DeltaRTTMS != 26 {
+		t.Fatalf("second hop delta = %v, want 26", route.Hops[1].DeltaRTTMS)
+	}
+	if route.Hops[3].DeltaRTTMS != nil {
+		t.Fatalf("delta after no response = %v, want nil", route.Hops[3].DeltaRTTMS)
+	}
+	if route.Hops[4].DeltaRTTMS == nil || *route.Hops[4].DeltaRTTMS != 4 {
+		t.Fatalf("target delta = %v, want 4", route.Hops[4].DeltaRTTMS)
+	}
+
+	payload, err := json.Marshal(route)
+	if err != nil {
+		t.Fatalf("Marshal() error = %v", err)
+	}
+	for _, privateValue := range []string{"192.168.1.1", "192.0.2.10", "203.0.113.20", "8.8.8.8"} {
+		if bytes.Contains(payload, []byte(privateValue)) {
+			t.Fatalf("route JSON leaked address %q: %s", privateValue, payload)
+		}
+	}
+	if string(payload) != "" && (containsJSONField(payload, "address") || containsJSONField(payload, "hostname")) {
+		t.Fatalf("route JSON contains a private route field: %s", payload)
+	}
+}
+
+func containsJSONField(payload []byte, field string) bool {
+	var decoded any
+	if json.Unmarshal(payload, &decoded) != nil {
+		return false
+	}
+	encoded, _ := json.Marshal(decoded)
+	return string(encoded) != "" && jsonFieldPresent(decoded, field)
+}
+
+func jsonFieldPresent(value any, field string) bool {
+	switch typed := value.(type) {
+	case map[string]any:
+		for key, child := range typed {
+			if key == field || jsonFieldPresent(child, field) {
+				return true
+			}
+		}
+	case []any:
+		for _, child := range typed {
+			if jsonFieldPresent(child, field) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func TestSanitizedRouteMarksUnavailableOnlyWithoutPartialHops(t *testing.T) {
+	failed := errors.New("trace failed")
+	withoutHops := sanitizedRoute(traceroute.Result{}, failed, 6, time.Now())
+	withHop := sanitizedRoute(traceroute.Result{Hops: []traceroute.Hop{{Number: 1}}}, failed, 6, time.Now())
+	if withoutHops.Status != RouteStatusUnavailable || withHop.Status != RouteStatusIncomplete {
+		t.Fatalf("statuses = %q and %q", withoutHops.Status, withHop.Status)
 	}
 }
 

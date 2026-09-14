@@ -14,14 +14,23 @@ import (
 )
 
 const (
-	Filename          = "config.json"
-	DefaultICMPTarget = "8.8.8.8"
-	DefaultHTTPTarget = "https://www.google.com/generate_204"
+	Filename                          = "config.json"
+	DefaultICMPTarget                 = "8.8.8.8"
+	DefaultHTTPTarget                 = "https://www.google.com/generate_204"
+	DefaultTracerouteIntervalSeconds = 60
+	DefaultTracerouteMaxNodes        = 6
 )
 
+type Traceroute struct {
+	Target          string `json:"target"`
+	IntervalSeconds int    `json:"intervalSeconds"`
+	MaxNodes        int    `json:"maxNodes"`
+}
+
 type Config struct {
-	ICMPTarget string `json:"icmpTarget"`
-	HTTPTarget string `json:"httpTarget"`
+	ICMPTarget string     `json:"icmpTarget"`
+	HTTPTarget string     `json:"httpTarget"`
+	Traceroute Traceroute `json:"traceroute"`
 }
 
 type ipResolver interface {
@@ -32,7 +41,18 @@ func Default() Config {
 	return Config{
 		ICMPTarget: DefaultICMPTarget,
 		HTTPTarget: DefaultHTTPTarget,
+		Traceroute: Traceroute{
+			IntervalSeconds: DefaultTracerouteIntervalSeconds,
+			MaxNodes:        DefaultTracerouteMaxNodes,
+		},
 	}
+}
+
+func (value Config) TracerouteTarget() string {
+	if value.Traceroute.Target != "" {
+		return value.Traceroute.Target
+	}
+	return value.ICMPTarget
 }
 
 func LoadFromExecutable(ctx context.Context) (Config, error) {
@@ -90,6 +110,17 @@ func validate(ctx context.Context, value Config, resolver ipResolver) error {
 	}
 	if err := validateHTTPTarget(value.HTTPTarget); err != nil {
 		return fmt.Errorf("httpTarget: %w", err)
+	}
+	if value.Traceroute.Target != "" {
+		if err := validateICMPTarget(ctx, value.Traceroute.Target, resolver); err != nil {
+			return fmt.Errorf("traceroute.target: %w", err)
+		}
+	}
+	if value.Traceroute.IntervalSeconds < 30 || value.Traceroute.IntervalSeconds > 3600 {
+		return errors.New("traceroute.intervalSeconds: must be between 30 and 3600")
+	}
+	if value.Traceroute.MaxNodes < 3 || value.Traceroute.MaxNodes > 12 {
+		return errors.New("traceroute.maxNodes: must be between 3 and 12")
 	}
 	return nil
 }

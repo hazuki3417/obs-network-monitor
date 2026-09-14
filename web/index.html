@@ -4,98 +4,60 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>OBS Network Monitor</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="/home.css">
 </head>
 <body>
-  <main class="panel" id="monitor-panel">
-    <h2 class="section-title latency-title">LATENCY</h2>
+  <main class="home">
+    <header>
+      <p class="eyebrow">LOCAL MONITOR SERVICE</p>
+      <h1>OBS Network Monitor</h1>
+      <p class="description">Windowsのネットワーク状態をOBS Browser Sourceへ表示するローカルモニターです。</p>
+    </header>
 
-    <section class="metrics" id="latency-metrics" aria-label="回線測定値">
-      <div class="metric">
-        <span class="label">LATENCY</span>
-        <strong id="latency">--</strong>
-        <span class="unit">ms</span>
-      </div>
-      <div class="metric">
-        <span class="label">JITTER</span>
-        <strong id="jitter">--</strong>
-        <span class="unit">ms</span>
-      </div>
-      <div class="metric">
-        <span class="label" id="failure-label">PACKET LOSS</span>
-        <strong id="failure-rate">--</strong>
-        <span class="unit">%</span>
-      </div>
-      <div class="metric">
-        <span class="label">FAIL STREAK</span>
-        <strong id="consecutive-failures">0</strong>
-        <span class="unit" aria-hidden="true"></span>
-      </div>
-    </section>
-
-    <section class="latency-summary" id="latency-summary" aria-label="直近60回の遅延統計">
-      <div>
-        <span class="label">AVG LATENCY</span>
-        <strong id="average-latency">--</strong>
-        <span class="unit">ms</span>
-      </div>
-      <div>
-        <span class="label">MIN LATENCY</span>
-        <strong id="minimum-latency">--</strong>
-        <span class="unit">ms</span>
-      </div>
-      <div>
-        <span class="label">MAX LATENCY</span>
-        <strong id="maximum-latency">--</strong>
-        <span class="unit">ms</span>
-      </div>
-    </section>
-
-    <section class="chart-card latency-chart-card" id="latency-chart" aria-label="遅延グラフ">
-      <svg class="chart" id="latency-chart-svg" viewBox="-36 0 516 112" role="img" aria-label="直近60回の遅延グラフ">
-        <line class="grid-line" x1="0" y1="1" x2="480" y2="1"></line>
-        <line class="grid-line" x1="0" y1="56" x2="480" y2="56"></line>
-        <line class="grid-line" x1="0" y1="111" x2="480" y2="111"></line>
-        <path id="latency-path" d=""></path>
-        <g class="chart-axis" aria-hidden="true">
-          <text id="latency-axis-maximum" class="axis-label" x="-8" y="10" text-anchor="end">--</text>
-          <text id="latency-axis-middle" class="axis-label" x="-8" y="60" text-anchor="end">--</text>
-          <text class="axis-label" x="-8" y="111" text-anchor="end">0</text>
-          <text id="latency-overlay-maximum" class="axis-maximum" x="472" y="14" text-anchor="end">-- ms</text>
-        </g>
-      </svg>
-    </section>
-
-    <h2 class="section-title traffic-title">NIC TRAFFIC</h2>
-
-    <section class="chart-card traffic-card" id="traffic-section" aria-label="NIC通信量">
-      <div class="traffic-current">
+    <section class="health" aria-labelledby="health-title">
+      <h2 id="health-title">Health check</h2>
+      <dl>
         <div>
-          <span class="traffic-key transmit" aria-hidden="true"></span>
-          <span class="label">UPLOAD</span>
-          <strong id="tx-traffic">--</strong>
+          <dt>Local Web Server</dt>
+          <dd class="status is-healthy" id="service-status"><span aria-hidden="true"></span>Running</dd>
         </div>
         <div>
-          <span class="traffic-key receive" aria-hidden="true"></span>
-          <span class="label">DOWNLOAD</span>
-          <strong id="rx-traffic">--</strong>
+          <dt>WebSocket</dt>
+          <dd class="status is-pending" id="websocket-status"><span aria-hidden="true"></span>Connecting</dd>
         </div>
-      </div>
-      <svg class="chart traffic-chart" id="traffic-chart-svg" viewBox="-36 0 516 96" role="img" aria-label="直近60回のNIC送受信速度グラフ">
-        <line class="grid-line" x1="0" y1="1" x2="480" y2="1"></line>
-        <line class="grid-line" x1="0" y1="48" x2="480" y2="48"></line>
-        <line class="grid-line" x1="0" y1="95" x2="480" y2="95"></line>
-        <path id="traffic-transmit-path" class="traffic-path transmit" d=""></path>
-        <path id="traffic-receive-path" class="traffic-path receive" d=""></path>
-        <g class="chart-axis" aria-hidden="true">
-          <text id="traffic-axis-maximum" class="axis-label" x="-8" y="10" text-anchor="end">--</text>
-          <text id="traffic-axis-middle" class="axis-label" x="-8" y="52" text-anchor="end">--</text>
-          <text class="axis-label" x="-8" y="95" text-anchor="end">0</text>
-          <text id="traffic-overlay-maximum" class="axis-maximum" x="472" y="14" text-anchor="end">--</text>
-        </g>
-      </svg>
+        <div>
+          <dt>Monitor Stream</dt>
+          <dd class="status is-pending" id="stream-status"><span aria-hidden="true"></span>Waiting for data</dd>
+        </div>
+      </dl>
+      <p class="last-update">Last update: <time id="last-update">--</time></p>
     </section>
+
+    <nav class="resources" aria-labelledby="resources-title">
+      <h2 id="resources-title">Links</h2>
+      <ul class="links">
+        <li><span>Latency</span><a href="/latency">http://127.0.0.1:8080/latency</a></li>
+        <li><span>NIC Traffic</span><a href="/traffic">http://127.0.0.1:8080/traffic</a></li>
+        <li><span>Route</span><a href="/route">http://127.0.0.1:8080/route</a></li>
+        <li><span>使い方</span><a href="https://github.com/hazuki3417/obs-network-monitor#obsへ追加">https://github.com/hazuki3417/obs-network-monitor#obsへ追加</a></li>
+        <li><span>Repository</span><a href="https://github.com/hazuki3417/obs-network-monitor">https://github.com/hazuki3417/obs-network-monitor</a></li>
+      </ul>
+    </nav>
+
+    <section class="controls" aria-labelledby="controls-title">
+      <h2 id="controls-title">Application</h2>
+      <p>OBS Network Monitorの計測とローカルWebサーバーを終了します。</p>
+      <button class="shutdown-button" id="shutdown-button" type="button">Stop application</button>
+      <p class="shutdown-status" id="shutdown-status" role="status" aria-live="polite"></p>
+    </section>
+
+    <footer>
+      <span>© 2026 <a href="https://github.com/hazuki3417">hazuki3417</a></span>
+      <span>Created by <a href="https://github.com/hazuki3417">hazuki3417</a></span>
+      <a href="https://github.com/hazuki3417/obs-network-monitor/blob/develop/LICENSE">MIT License</a>
+    </footer>
   </main>
-  <script src="app.js"></script>
+  <script src="/shared/websocket.js"></script>
+  <script src="/app.js"></script>
 </body>
 </html>
