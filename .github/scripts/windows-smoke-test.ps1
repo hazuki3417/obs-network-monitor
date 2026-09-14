@@ -87,6 +87,25 @@ function Assert-MonitorSnapshot {
     if ($null -eq $Snapshot.generatedAt) {
         throw "Snapshot does not contain generatedAt."
     }
+    if ($null -eq $Snapshot.route) {
+        throw "Snapshot does not contain route information."
+    }
+    $routeProperties = $Snapshot.route.PSObject.Properties.Name
+    foreach ($property in @("status", "checkedAt", "hopCount", "maxNodes", "hops")) {
+        if ($routeProperties -notcontains $property) {
+            throw "Snapshot route does not contain $property."
+        }
+    }
+    if (@("measuring", "complete", "incomplete", "unavailable") -notcontains $Snapshot.route.status) {
+        throw "Unexpected route status: $($Snapshot.route.status)"
+    }
+    if ($Snapshot.route.maxNodes -ne 6) {
+        throw "Unexpected route maxNodes: $($Snapshot.route.maxNodes)"
+    }
+    $serializedRoute = $Snapshot.route | ConvertTo-Json -Depth 8 -Compress
+    if ($serializedRoute -match '"address"' -or $serializedRoute -match '"hostname"') {
+        throw "Route exposes an address or hostname: $serializedRoute"
+    }
 }
 
 function Test-RunningMonitor {
@@ -138,7 +157,8 @@ function Test-RunningMonitor {
 
         $displayPages = @(
             @{ Path = "latency"; Present = "latency-chart-canvas"; Absent = "traffic-chart-canvas" },
-            @{ Path = "traffic"; Present = "traffic-chart-canvas"; Absent = "latency-chart-canvas" }
+            @{ Path = "traffic"; Present = "traffic-chart-canvas"; Absent = "latency-chart-canvas" },
+            @{ Path = "route"; Present = "route-nodes"; Absent = "chart-canvas" }
         )
         foreach ($displayPage in $displayPages) {
             $displayResponse = Invoke-WebRequest `
@@ -201,7 +221,7 @@ try {
         -ConfigContent $null `
         -ExpectedTargets @("8.8.8.8", "https://www.google.com/generate_204")
 
-    $validConfig = '{"icmpTarget":"1.1.1.1","httpTarget":"https://example.com/"}'
+    $validConfig = '{"icmpTarget":"1.1.1.1","httpTarget":"https://example.com/","traceroute":{"intervalSeconds":60,"maxNodes":6}}'
     Test-RunningMonitor `
         -Name "valid-config" `
         -ConfigContent $validConfig `

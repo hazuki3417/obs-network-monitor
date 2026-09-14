@@ -20,7 +20,7 @@
 - [ ] Local Web ServerがRunningと表示された
 - [ ] WebSocketがConnectedと表示された
 - [ ] Monitor StreamがReceiving dataとなり、最終更新時刻が表示された
-- [ ] Latency、NIC Traffic、使い方、GitHub、MIT Licenseへのリンクが表示された
+- [ ] Latency、NIC Traffic、Route、使い方、GitHub、MIT Licenseへのリンクが表示された
 - [ ] ルートに遅延・通信量の数値やグラフが表示されなかった
 
 ## 2. 有効な設定
@@ -84,6 +84,8 @@ ICMPを返さない検証用ネットワークまたは測定先を使い、HTTP
 3. 別のブラウザソースへ `http://127.0.0.1:8080/traffic`、サイズを480 x 210で追加する。
 4. OBSのシーンを切り替え、ソースを再表示する。
 
+別のブラウザソースへ `http://127.0.0.1:8080/route`、サイズを480 x 300で追加する。
+
 - [ ] `LATENCY` と `NIC TRAFFIC` の数値とグラフを判読できた
 - [ ] 遅延統計のラベル、値、単位が列ごとに揃って表示された
 - [ ] パネル、NIC情報、リンク速度、グラフタイトル、グラフ下部ラベルが表示されない
@@ -104,6 +106,10 @@ ICMPを返さない検証用ネットワークまたは測定先を使い、HTTP
 
 - [ ] `/latency` では遅延セクションだけが表示された
 - [ ] `/traffic` ではNIC通信量セクションだけが表示された
+- [ ] `/route` では匿名化した経路だけが縦型タイムラインで表示された
+- [ ] `/route` にIPアドレスとホスト名が表示されなかった
+- [ ] `/route` の表示が最大6ノードで、`LOCAL` と `TARGET` が残った
+- [ ] 20 ms以上の隣接RTT増加、応答なし、不完全経路を再現できる場合に、それぞれ `LATENCY`、`NO RESPONSE`、`ROUTE INCOMPLETE` が表示された
 
 5. URLへ `?parts=values`、`?parts=graph`、`?parts=values,graph` を順に指定する。
 6. `/traffic?parts=graph` のように表示URLと併用する。

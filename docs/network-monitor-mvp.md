@@ -14,6 +14,7 @@ Windows PCが現在使用しているインターネット接続について、O
 - 直近60秒の遅延推移
 - 直近60秒の送受信速度推移
 - 現在の連続測定失敗回数
+- IPアドレスとホスト名を匿名化したTraceroute
 
 本MVPでは測定値をそのまま提示し、回線品質の良否をアプリケーション側では判定しない。
 
@@ -44,7 +45,12 @@ Windows PCが現在使用しているインターネット接続について、O
 ```json
 {
   "icmpTarget": "8.8.8.8",
-  "httpTarget": "https://www.google.com/generate_204"
+  "httpTarget": "https://www.google.com/generate_204",
+  "traceroute": {
+    "target": "",
+    "intervalSeconds": 60,
+    "maxNodes": 6
+  }
 }
 ```
 
@@ -56,8 +62,12 @@ Windows PCが現在使用しているインターネット接続について、O
 
 - `icmpTarget`: IPv4アドレスまたはIPv4へ名前解決できるホスト名
 - `httpTarget`: `https` URL
+- `traceroute.target`: 空文字、IPv4アドレス、またはIPv4へ名前解決できるホスト名。空文字では `icmpTarget` を継承
+- `traceroute.intervalSeconds`: 30以上3600以下
+- `traceroute.maxNodes`: 3以上12以下
 - 未知のJSONフィールド: エラー
-- 空文字: エラー
+- `icmpTarget` / `httpTarget` の空文字: エラー
+- `traceroute.target` の空文字: `icmpTarget` の継承指定として有効
 
 ## 4. 使用中NICの選択
 
@@ -104,6 +114,14 @@ ICMPが3回連続で失敗した場合、HTTP測定先へ確認リクエスト�
 HTTPの応答時間にはDNS、TCP、TLSおよびHTTPサーバーの処理時間が含まれるため、ICMP RTTと同一の値として比較しない。通常のWebダッシュボードには測定方式を表示する。
 
 測定方式が切り替わったときは統計履歴をリセットし、異なる意味の測定値を同一集計へ混在させない。
+
+### 5.3 Traceroute
+
+TracerouteはWindows ICMP APIを使用し、TTLを1から最大30まで増やす。各ホップは1回、最大1秒で測定し、対象へ到達した時点で終了する。通常のICMP / HTTP測定とは別のgoroutineで順次実行し、前回の経路測定が完了してから既定60秒後に次を開始する。経路測定同士を重ねず、失敗しても通常測定とプロセスを停止しない。
+
+経路データはプロセス内ではIPアドレスを保持できるが、WebSocketへはホップ番号、応答有無、RTT、直前の応答ホップからのRTT差、対象到達フラグだけを送る。IPアドレスとホスト名は配信しない。RTT差は応答なしを挟いだ場合は算出せず、各ホップのRTTを合計しない。
+
+OBS表示は `LOCAL` と `TARGET` を必ず残し、その間を最大ノード数へ集約する。隣接する応答ホップ間でRTTが20 ms以上増えた箇所を遅延増加として優先し、連続する遅延増加はまとめられる。応答なしは経路障害の断定材料にせず `NO RESPONSE` と弱く表示し、対象へ到達しない場合は `ROUTE INCOMPLETE` とする。
 
 ## 6. 統計値
 
@@ -159,6 +177,7 @@ requestFailure = 失敗したHTTP測定数 / 全HTTP測定数 * 100
 4. NIC送受信速度と左右の描画余白を含む65秒以上の通信履歴管理
 5. 統計値の計算
 6. 最新スナップショットの生成
+7. 独立周期でのTracerouteと匿名化
 
 WebSocketクライアントは共有モニターの最新スナップショットを受信する。ブラウザ接続数が増えても外部への測定回数は増加しない。
 
@@ -174,6 +193,7 @@ WebSocketクライアントは共有モニターの最新スナップショッ�
 - 現在のNIC送信・受信速度と左右の描画余白を含む65秒以上の履歴
 - 左右の描画余白を含む65秒以上の時刻、成否、RTT
 - スナップショット生成時刻
+- 匿名化した経路状態とホップ情報
 
 WebSocketでは次の構造をJSONで配信する。測定成功値がまだない場合、`latestLatencyMs` と `jitterMs` は `null` とする。遅いクライアント向けに過去のスナップショットを滞留させず、未送信値を最新値で置き換える。
 
@@ -220,6 +240,42 @@ WebSocketでは次の構造をJSONで配信する。測定成功値がまだな�
       "checkedAt": "2026-09-12T10:00:00Z"
     }
   ],
+  "route": {
+    "status": "complete",
+    "checkedAt": "2026-09-12T09:59:30Z",
+    "hopCount": 4,
+    "maxNodes": 6,
+    "hops": [
+      {
+        "number": 1,
+        "responded": true,
+        "rttMs": 2,
+        "deltaRttMs": null,
+        "target": false
+      },
+      {
+        "number": 2,
+        "responded": true,
+        "rttMs": 28,
+        "deltaRttMs": 26,
+        "target": false
+      },
+      {
+        "number": 3,
+        "responded": false,
+        "rttMs": null,
+        "deltaRttMs": null,
+        "target": false
+      },
+      {
+        "number": 4,
+        "responded": true,
+        "rttMs": 31,
+        "deltaRttMs": null,
+        "target": true
+      }
+    ]
+  },
   "generatedAt": "2026-09-12T10:00:00Z"
 }
 ```
@@ -230,15 +286,15 @@ WebSocketでは次の構造をJSONで配信する。測定成功値がまだな�
 
 OBS表示は透明なオーバーレイとし、背景、外枠、パネル、カード、全体タイトル、NIC名・状態・リンク速度、測定先、配信状態を表示しない。ルート `/` は通常ブラウザ向けの案内ページとし、OBS表示には使用しない。
 
-OBS向け表示は `/latency` と `/traffic` の2ページで構成する。`/latency` は遅延だけを480 x 270 px、`/traffic` はNIC通信量だけを480 x 210 pxで表示する。両方を表示する場合は、OBSで2つのBrowser Sourceを配置する。未知のパスは404を返す。
+OBS向け表示は `/latency`、`/traffic`、`/route` の3ページで構成する。`/latency` は遅延だけを480 x 270 px、`/traffic` はNIC通信量だけを480 x 210 px、`/route` は匿名化した経路を480 x 300 pxで表示する。複数を表示する場合は、OBSで独立したBrowser Sourceとして配置する。未知のパスは404を返す。
 
-ルート `/` にはLocal Web Server、WebSocket接続、モニターデータ受信の状態、最終更新時刻を表示する。状態アイコンと文言は固定幅の列で開始位置を揃える。あわせて `/latency`、`/traffic`、GitHubリポジトリ、READMEの使い方をURLが見える箇条書きで表示し、フッターにMIT Licenseへのリンク、`© 2026 hazuki3417`、制作者を表示する。
+ルート `/` にはLocal Web Server、WebSocket接続、モニターデータ受信の状態、最終更新時刻を表示する。状態アイコンと文言は固定幅の列で開始位置を揃える。あわせて `/latency`、`/traffic`、`/route`、GitHubリポジトリ、READMEの使い方をURLが見える箇条書きで表示し、フッターにMIT Licenseへのリンク、`© 2026 hazuki3417`、制作者を表示する。
 
-数値一覧とグラフは、各表示URLでWebSocket接続を分割せず表示だけを `parts` クエリで切り替える。`parts=values` は数値のみ、`parts=graph` はグラフのみ、`parts=values,graph` または未指定は両方を表示する。有効な値がない場合は両方へフォールバックする。
+数値一覧とグラフは、`/latency` と `/traffic` でWebSocket接続を分割せず表示だけを `parts` クエリで切り替える。`parts=values` は数値のみ、`parts=graph` はグラフのみ、`parts=values,graph` または未指定は両方を表示する。有効な値がない場合は両方へフォールバックする。`/route` は経路全体を1つの表示単位とし、`parts` では分割しない。
 
 各Browser Sourceは共通のWebSocketエンドポイント `/ws` へ個別に接続する。バックエンドのモニター、履歴、最新スナップショットは全接続で共有し、クライアント数によってICMP、HTTP、NICの測定回数を増やさない。WebSocketのJSON契約もページ間で共通とする。
 
-静的UIは `web/latency/` と `web/traffic/` にページ固有のHTML・エントリースクリプト・描画モジュールを配置する。WebSocket接続、表示オプション、Canvas描画、DOM更新、基礎スタイルは `web/shared/` に置き、両ページから絶対パスで読み込む。ルートは案内ページ固有のHTML、スクリプト、スタイルだけを読み込み、グラフ描画モジュールを読み込まない。外部パッケージやフロントエンドのビルド工程は追加しない。
+静的UIは `web/latency/`、`web/traffic/`、`web/route/` にページ固有のHTML・エントリースクリプト・描画モジュールを配置する。WebSocket接続、表示オプション、Canvas描画、DOM更新、基礎スタイルは `web/shared/` に置き、必要なページから絶対パスで読み込む。ルート `/` は案内ページ固有のHTML、スクリプト、スタイルだけを読み込み、グラフ描画モジュールを読み込まない。外部パッケージやフロントエンドのビルド工程は追加しない。
 
 表示項目:
 
@@ -249,6 +305,7 @@ OBS向け表示は `/latency` と `/traffic` の2ページで構成する。`/la
 - 直近60秒の小さな遅延折れ線グラフ
 - 平均 / 最小 / 最大遅延と連続失敗回数
 - 直近60秒の送受信速度グラフ
+- 匿名化した経路の縦型タイムライン
 
 OBS向け表示では、遅延統計を2列に整列し、各列内のラベル・値・単位を独立した3列として配置する。ラベルは左揃え、固定幅の値列は右揃え、固定幅の単位列は左揃えとし、単位の文字数による位置ずれを防ぐ。NIC通信量の現在値はグラフの直前に配置する。グラフはタイトル、サンプル数、過去・現在ラベル、データ待機中の中央テキストを表示せず、左側に上限・中間・0、右上に単位付き上限値を表示する。
 
@@ -262,6 +319,7 @@ WebSocketが切断された場合は既存画面を消さず、配信状態は�
 
 - 使用可能な経路またはNICがない場合、NICを未接続として表現し、プロセスは継続する
 - 一時的な測定失敗でプロセスを終了しない
+- Tracerouteのタイムアウト・不完全経路・一時エラーで通常測定を停止しない
 - 設定不備は起動時エラーとする
 - WebSocketクライアントの切断は測定処理へ影響させない
 - 測定およびNIC取得のエラーは、継続運転を妨げない範囲でログへ記録する
@@ -278,6 +336,9 @@ Windows Quality Gateで少なくとも次を検証する。
 - 平均・最小・最大遅延と連続失敗回数の計算
 - ICMPからHTTP、HTTPからICMPへの状態遷移
 - 測定方式切り替え時の履歴リセット
+- TracerouteのTTL増加、対象到達時の停止、最大30ホップ、不完全経路
+- 経路JSONにIPアドレス・ホスト名が含まれないこと
+- 経路の最大ノード数、遅延増加・応答なし・不完全経路の表示
 - WebSocketスナップショットのJSON形式
 - Windows向け実行ファイルのビルド
 
@@ -299,6 +360,7 @@ Windows APIと外部通信はインターフェースで分離し、単体テス
 12. 総合的な回線品質判定を表示しない
 13. 使用中NICの現在の送信・受信速度と直近60回の推移を表示できる
 14. 直近60回の平均・最小・最大遅延と現在の連続失敗回数を表示できる
-15. `/latency` と `/traffic` を独立したOBS Browser Sourceとして表示できる
+15. `/latency`、`/traffic`、`/route` を独立したOBS Browser Sourceとして表示できる
 16. ルート `/` でWebSocketとモニターデータの稼働状態を確認できる
 17. MIT License、著作権者、制作者がリポジトリとルートに明記されている
+18. Tracerouteが通常測定を妨げず、匿名化・集約された経路を最大ノード数内で表示できる
