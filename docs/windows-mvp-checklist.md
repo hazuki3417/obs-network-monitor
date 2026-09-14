@@ -17,10 +17,11 @@
 3. ブラウザで `http://127.0.0.1:8080/` を開く。
 
 - [ ] 管理者権限を要求されずに起動した
-- [ ] パネル、NIC情報、リンク速度、測定先が表示されない
-- [ ] 遅延、ジッター、失敗率が更新された
-- [ ] 数値が約1秒ごとの実測値へ更新された
-- [ ] 遅延グラフと通信量グラフが1秒ごとに跳ねず、連続して左へ移動した
+- [ ] Local Web ServerがRunningと表示された
+- [ ] WebSocketがConnectedと表示された
+- [ ] Monitor StreamがReceiving dataとなり、最終更新時刻が表示された
+- [ ] Latency、NIC Traffic、使い方、GitHub、MIT Licenseへのリンクが表示された
+- [ ] ルートに遅延・通信量の数値やグラフが表示されなかった
 
 ## 2. 有効な設定
 
@@ -79,8 +80,9 @@ ICMPを返さない検証用ネットワークまたは測定先を使い、HTTP
 ## 7. OBS Browser Source
 
 1. OBSで「ブラウザ」ソースを追加する。
-2. URLを `http://127.0.0.1:8080/`、幅と高さを `480` にする。
-3. OBSのシーンを切り替え、ソースを再表示する。
+2. URLを `http://127.0.0.1:8080/latency`、サイズを480 x 270にする。
+3. 別のブラウザソースへ `http://127.0.0.1:8080/traffic`、サイズを480 x 210で追加する。
+4. OBSのシーンを切り替え、ソースを再表示する。
 
 - [ ] `LATENCY` と `NIC TRAFFIC` の数値とグラフを判読できた
 - [ ] 遅延統計のラベル、値、単位が列ごとに揃って表示された
@@ -92,15 +94,11 @@ ICMPを返さない検証用ネットワークまたは測定先を使い、HTTP
 - [ ] シーン再表示後にWebSocketが接続し、最新値へ復帰した
 - [ ] 画面に総合的な回線品質判定や閾値色分けがない
 
-4. URLを `http://127.0.0.1:8080/latency`、サイズを480 x 270に変更する。
-5. URLを `http://127.0.0.1:8080/traffic`、サイズを480 x 210に変更する。
-
 - [ ] `/latency` では遅延セクションだけが表示された
 - [ ] `/traffic` ではNIC通信量セクションだけが表示された
-- [ ] 従来の `/?sections=latency` と `/?sections=traffic` も同じ表示になった
 
-6. URLへ `?parts=values`、`?parts=graph`、`?parts=values,graph` を順に指定する。
-7. `/traffic?parts=graph` のように表示URLと併用する。
+5. URLへ `?parts=values`、`?parts=graph`、`?parts=values,graph` を順に指定する。
+6. `/traffic?parts=graph` のように表示URLと併用する。
 
 - [ ] `parts=values` では数値だけが表示された
 - [ ] `parts=graph` ではグラフだけが表示された
