@@ -232,7 +232,7 @@ OBS表示は透明なオーバーレイとし、背景、外枠、パネル、�
 
 OBS向け表示は `/latency` と `/traffic` の2ページで構成する。`/latency` は遅延だけを480 x 270 px、`/traffic` はNIC通信量だけを480 x 210 pxで表示する。両方を表示する場合は、OBSで2つのBrowser Sourceを配置する。未知のパスは404を返す。
 
-ルート `/` にはLocal Web Server、WebSocket接続、モニターデータ受信の状態、最終更新時刻を表示する。あわせて `/latency`、`/traffic`、GitHubリポジトリ、READMEの使い方、MIT Licenseへのリンクと、`© 2026 hazuki3417`、制作者を表示する。
+ルート `/` にはLocal Web Server、WebSocket接続、モニターデータ受信の状態、最終更新時刻を表示する。状態アイコンと文言は固定幅の列で開始位置を揃える。あわせて `/latency`、`/traffic`、GitHubリポジトリ、READMEの使い方をURLが見える箇条書きで表示し、フッターにMIT Licenseへのリンク、`© 2026 hazuki3417`、制作者を表示する。
 
 数値一覧とグラフは、各表示URLでWebSocket接続を分割せず表示だけを `parts` クエリで切り替える。`parts=values` は数値のみ、`parts=graph` はグラフのみ、`parts=values,graph` または未指定は両方を表示する。有効な値がない場合は両方へフォールバックする。
 

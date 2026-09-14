@@ -66,6 +66,7 @@ const pages = {
   },
 };
 const overlayCSS = fs.readFileSync('web/shared/base.css', 'utf8');
+const homeCSS = fs.readFileSync('web/home.css', 'utf8');
 
 for (const [name, page] of Object.entries(pages)) {
   const ids = [...page.html.matchAll(/id="([^"]+)"/g)].map((match) => match[1]);
@@ -82,6 +83,9 @@ assert.match(pages.home.html, /href="\/traffic"/);
 assert.match(pages.home.html, /github\.com\/hazuki3417\/obs-network-monitor/);
 assert.match(pages.home.html, /MIT License/);
 assert.match(pages.home.html, /© 2026/);
+assert.match(pages.home.html, /<ul class="links">/);
+assert.match(pages.home.html, /href="\/latency">http:\/\/127\.0\.0\.1:8080\/latency<\/a>/);
+assert.match(pages.home.html, /<footer>[\s\S]*MIT License[\s\S]*<\/footer>/);
 assert.doesNotMatch(pages.home.html, /latency-chart-canvas|traffic-chart-canvas/);
 assert.match(pages.latency.html, /id="latency-chart-canvas"/);
 assert.doesNotMatch(pages.latency.html, /id="traffic-chart-canvas"/);
@@ -89,6 +93,7 @@ assert.match(pages.traffic.html, /id="traffic-chart-canvas"/);
 assert.doesNotMatch(pages.traffic.html, /id="latency-chart-canvas"/);
 assert.match(overlayCSS, /data-parts="values"/);
 assert.match(overlayCSS, /data-parts="graph"/);
+assert.match(homeCSS, /grid-template-columns: minmax\(0, 1fr\) 160px/);
 
 function loadPage(page, search = '') {
   const ids = [...page.html.matchAll(/id="([^"]+)"/g)].map((match) => match[1]);
