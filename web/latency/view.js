@@ -1,11 +1,10 @@
 (function initializeLatencyView(namespace) {
-  const chart = {width: 480, height: 112, capacity: 60};
-
   function formatValue(value, digits = 0) {
     return Number.isFinite(value) ? value.toFixed(digits) : '--';
   }
 
   namespace.createLatencyView = function createLatencyView(root = document) {
+    const showValues = document.body.dataset.parts !== 'graph';
     const elements = {
       latency: root.querySelector('#latency'),
       averageLatency: root.querySelector('#average-latency'),
@@ -15,48 +14,40 @@
       failureLabel: root.querySelector('#failure-label'),
       failureRate: root.querySelector('#failure-rate'),
       consecutiveFailures: root.querySelector('#consecutive-failures'),
-      chartPath: root.querySelector('#latency-path'),
-      axisMaximum: root.querySelector('#latency-axis-maximum'),
-      axisMiddle: root.querySelector('#latency-axis-middle'),
-      overlayMaximum: root.querySelector('#latency-overlay-maximum'),
+      chart: root.querySelector('#latency-chart-canvas'),
     };
-
-    function renderChart(rawHistory) {
-      const {compactNumber, niceMaximum, segmentedSmoothPath} = namespace.charts;
-      const history = rawHistory.slice(-chart.capacity);
-      const successes = history.filter((entry) => entry.success && Number.isFinite(entry.rttMs));
-      const maximum = niceMaximum(Math.max(0, ...successes.map((entry) => entry.rttMs)));
-      const firstSlot = chart.capacity - history.length;
-      const path = segmentedSmoothPath(history, (entry, index) => {
-        if (!entry.success || !Number.isFinite(entry.rttMs)) return null;
-        const x = ((firstSlot + index) / (chart.capacity - 1)) * chart.width;
-        const y = chart.height - (Math.max(0, entry.rttMs) / maximum) * chart.height;
-        return {x, y};
-      });
-
-      elements.chartPath.setAttribute('d', path);
-      elements.axisMaximum.textContent = successes.length ? compactNumber(maximum) : '--';
-      elements.axisMiddle.textContent = successes.length ? compactNumber(maximum / 2) : '--';
-      elements.overlayMaximum.textContent = successes.length ? `${maximum} ms` : '-- ms';
-    }
+    const chart = elements.chart && document.body.dataset.parts !== 'values'
+      ? namespace.charts.createCanvasChart(elements.chart, {
+        width: 516,
+        height: 112,
+        minimum: 10,
+        emptyLabel: '-- ms',
+        scaleLabel: (maximum) => `${namespace.charts.compactNumber(maximum)} ms`,
+        series: [{key: 'latency', color: 'latency'}],
+        value: (entry) => (entry.success && Number.isFinite(entry.rttMs) ? entry.rttMs : null),
+      })
+      : null;
 
     return function renderLatency(snapshot) {
       const statistics = snapshot.statistics || {};
       const history = Array.isArray(snapshot.history) ? snapshot.history : [];
 
-      elements.latency.textContent = formatValue(statistics.latestLatencyMs);
-      elements.averageLatency.textContent = formatValue(statistics.averageLatencyMs, 1);
-      elements.minimumLatency.textContent = formatValue(statistics.minimumLatencyMs);
-      elements.maximumLatency.textContent = formatValue(statistics.maximumLatencyMs);
-      elements.jitter.textContent = formatValue(statistics.jitterMs, 1);
-      elements.failureLabel.textContent = statistics.failureMetric === 'requestFailure'
-        ? 'REQUEST FAILURE'
-        : 'PACKET LOSS';
-      elements.failureRate.textContent = formatValue(statistics.failureRatePercent, 1);
-      elements.consecutiveFailures.textContent = Number.isInteger(statistics.consecutiveFailures)
-        ? statistics.consecutiveFailures
-        : '--';
-      renderChart(history);
+      if (showValues) {
+        const {updateText} = namespace.dom;
+        updateText(elements.latency, formatValue(statistics.latestLatencyMs));
+        updateText(elements.averageLatency, formatValue(statistics.averageLatencyMs, 1));
+        updateText(elements.minimumLatency, formatValue(statistics.minimumLatencyMs));
+        updateText(elements.maximumLatency, formatValue(statistics.maximumLatencyMs));
+        updateText(elements.jitter, formatValue(statistics.jitterMs, 1));
+        updateText(elements.failureLabel, statistics.failureMetric === 'requestFailure'
+          ? 'REQUEST FAILURE'
+          : 'PACKET LOSS');
+        updateText(elements.failureRate, formatValue(statistics.failureRatePercent, 1));
+        updateText(elements.consecutiveFailures, Number.isInteger(statistics.consecutiveFailures)
+          ? statistics.consecutiveFailures
+          : '--');
+      }
+      chart?.update(history, snapshot.generatedAt);
     };
   };
 }(window.NetworkMonitor = window.NetworkMonitor || {}));
