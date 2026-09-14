@@ -98,8 +98,8 @@ type Monitor struct {
 	history       historyWindow
 	traffic       trafficWindow
 	tracker       trafficTracker
-	racer         traceroute.Tracer
-	racerInterval time.Duration
+	tracer          traceroute.Tracer
+	tracerInterval  time.Duration
 	tracerMaxNodes int
 	routeResult   traceroute.Result
 	route         Route
