@@ -60,6 +60,7 @@ jobs:
           Copy-Item dist/obs-network-monitor.exe $package/
           Copy-Item config.example.json $package/
           Copy-Item README.md $package/
+          Copy-Item LICENSE $package/
 
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4

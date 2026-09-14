@@ -43,16 +43,14 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
-body[data-page="latency"] .panel,
-body[data-sections="latency"] .panel {
+body[data-page="latency"] .panel {
   grid-template-areas:
     "latency-title latency-title"
     "latency-current latency-summary"
     "latency-chart latency-chart";
 }
 
-body[data-page="traffic"] .panel,
-body[data-sections="traffic"] .panel {
+body[data-page="traffic"] .panel {
   grid-template-areas:
     "traffic-title traffic-title"
     "traffic traffic";
@@ -202,15 +200,6 @@ body[data-page="traffic"] .traffic-title {
 
 .traffic-chart {
   height: 96px;
-}
-
-body[data-sections="latency"] .traffic-title,
-body[data-sections="latency"] .traffic-card,
-body[data-sections="traffic"] .latency-title,
-body[data-sections="traffic"] .metrics,
-body[data-sections="traffic"] .latency-summary,
-body[data-sections="traffic"] .latency-chart-card {
-  display: none;
 }
 
 body[data-parts="values"] .latency-chart-card,

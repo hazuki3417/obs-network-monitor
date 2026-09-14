@@ -90,6 +90,7 @@ ZIPには次のファイルが含まれます。
 - `obs-network-monitor.exe`
 - `config.example.json`
 - `README.md`
+- `LICENSE`
 
 成果物はコード署名されていません。チェックサムはダウンロード破損や意図しない差し替えの確認に使用できます。
 

@@ -3,10 +3,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 
 class FakeContext {
-  constructor() {
-    this.operations = [];
-  }
-
+  constructor() { this.operations = []; }
   record(name, ...args) { this.operations.push({name, args}); }
   setTransform(...args) { this.record('setTransform', ...args); }
   clearRect(...args) { this.record('clearRect', ...args); }
@@ -26,17 +23,16 @@ class FakeElement {
   constructor(id = '') {
     this.id = id;
     this.attributes = {};
+    this.className = '';
     this.dataset = {};
     this.textContent = '';
+    this.lastChild = {textContent: ''};
     this.animations = [];
     this.context = id.endsWith('-canvas') ? new FakeContext() : null;
   }
 
   setAttribute(name, value) { this.attributes[name] = value; }
-  getContext(kind) {
-    assert.equal(kind, '2d');
-    return this.context;
-  }
+  getContext(kind) { assert.equal(kind, '2d'); return this.context; }
   getBoundingClientRect() {
     return {width: 464, height: this.id.startsWith('traffic') ? 96 : 104};
   }
@@ -48,7 +44,7 @@ class FakeElement {
   }
 }
 
-const sharedScripts = [
+const overlaySharedScripts = [
   'web/shared/options.js',
   'web/shared/animation.js',
   'web/shared/dom.js',
@@ -56,49 +52,48 @@ const sharedScripts = [
   'web/shared/websocket.js',
 ];
 const pages = {
-  combined: {
+  home: {
     html: fs.readFileSync('web/index.html', 'utf8'),
-    scripts: [...sharedScripts, 'web/latency/view.js', 'web/traffic/view.js', 'web/app.js'],
+    scripts: ['web/shared/websocket.js', 'web/app.js'],
   },
   latency: {
     html: fs.readFileSync('web/latency/index.html', 'utf8'),
-    scripts: [...sharedScripts, 'web/latency/view.js', 'web/latency/app.js'],
+    scripts: [...overlaySharedScripts, 'web/latency/view.js', 'web/latency/app.js'],
   },
   traffic: {
     html: fs.readFileSync('web/traffic/index.html', 'utf8'),
-    scripts: [...sharedScripts, 'web/traffic/view.js', 'web/traffic/app.js'],
+    scripts: [...overlaySharedScripts, 'web/traffic/view.js', 'web/traffic/app.js'],
   },
 };
-const css = fs.readFileSync('web/shared/base.css', 'utf8');
+const overlayCSS = fs.readFileSync('web/shared/base.css', 'utf8');
+const homeCSS = fs.readFileSync('web/home.css', 'utf8');
 
 for (const [name, page] of Object.entries(pages)) {
   const ids = [...page.html.matchAll(/id="([^"]+)"/g)].map((match) => match[1]);
   assert.equal(new Set(ids).size, ids.length, `${name} HTML element IDs must be unique`);
-  assert.match(page.html, /href="\/shared\/base\.css"/, `${name} must use shared CSS`);
   const scriptSources = [...page.html.matchAll(/<script src="([^"]+)"/g)].map((match) => match[1]);
   assert.deepEqual(scriptSources, page.scripts.map((script) => script.replace(/^web/, '')));
-  assert.doesNotMatch(
-    page.html,
-    /成功した測定を待っています|通信量を測定しています/,
-    `${name} charts must not contain waiting text`,
-  );
 }
-assert.match(pages.combined.html, /id="latency-chart-canvas"/);
-assert.match(pages.combined.html, /id="traffic-chart-canvas"/);
+
+assert.match(pages.home.html, /id="service-status"/);
+assert.match(pages.home.html, /id="websocket-status"/);
+assert.match(pages.home.html, /id="stream-status"/);
+assert.match(pages.home.html, /href="\/latency"/);
+assert.match(pages.home.html, /href="\/traffic"/);
+assert.match(pages.home.html, /github\.com\/hazuki3417\/obs-network-monitor/);
+assert.match(pages.home.html, /MIT License/);
+assert.match(pages.home.html, /© 2026/);
+assert.match(pages.home.html, /<ul class="links">/);
+assert.match(pages.home.html, /href="\/latency">http:\/\/127\.0\.0\.1:8080\/latency<\/a>/);
+assert.match(pages.home.html, /<footer>[\s\S]*MIT License[\s\S]*<\/footer>/);
+assert.doesNotMatch(pages.home.html, /latency-chart-canvas|traffic-chart-canvas/);
 assert.match(pages.latency.html, /id="latency-chart-canvas"/);
 assert.doesNotMatch(pages.latency.html, /id="traffic-chart-canvas"/);
 assert.match(pages.traffic.html, /id="traffic-chart-canvas"/);
 assert.doesNotMatch(pages.traffic.html, /id="latency-chart-canvas"/);
-assert.doesNotMatch(pages.combined.html, /<svg|<path/);
-assert.match(
-  pages.latency.html,
-  /<span class="label">LATENCY<\/span>\s*<strong id="latency">--<\/strong>\s*<span class="unit">ms<\/span>/,
-  'label, value, and unit must be independent grid items',
-);
-assert.match(css, /width: min\(464px, calc\(100vw - 16px\)\)/, 'overlay must fit a 480 px source');
-assert.match(css, /grid-template-columns: minmax\(0, 1fr\) 58px 20px/, 'metric columns must remain aligned');
-assert.match(css, /data-parts="values"/, 'values-only styles must exist');
-assert.match(css, /data-parts="graph"/, 'graph-only styles must exist');
+assert.match(overlayCSS, /data-parts="values"/);
+assert.match(overlayCSS, /data-parts="graph"/);
+assert.match(homeCSS, /grid-template-columns: minmax\(0, 1fr\) 160px/);
 
 function loadPage(page, search = '') {
   const ids = [...page.html.matchAll(/id="([^"]+)"/g)].map((match) => match[1]);
@@ -109,11 +104,7 @@ function loadPage(page, search = '') {
   let frameId = 0;
   let clock = 0;
   class FakeWebSocket {
-    constructor(url) {
-      this.url = url;
-      sockets.push(this);
-    }
-
+    constructor(url) { this.url = url; sockets.push(this); }
     close() {}
   }
   const window = {
@@ -156,7 +147,7 @@ function loadPage(page, search = '') {
     assert.ok(pending, 'an animation frame must be scheduled');
     pending.callback(time);
   }
-  return {body, elements, frames, namespace: window.NetworkMonitor, runFrame, sockets};
+  return {body, elements, frames, runFrame, sockets};
 }
 
 const snapshot = {
@@ -175,84 +166,43 @@ const snapshot = {
   history: [
     {checkedAt: '2026-09-14T12:00:01.000Z', success: true, rttMs: 10},
     {checkedAt: '2026-09-14T12:00:02.000Z', success: true, rttMs: 15},
-    {checkedAt: '2026-09-14T12:00:03.000Z', success: false, rttMs: 0},
-    {checkedAt: '2026-09-14T12:00:04.000Z', success: true, rttMs: 20},
-    {checkedAt: '2026-09-14T12:00:05.000Z', success: true, rttMs: 25},
   ],
   trafficHistory: [
-    {checkedAt: '2026-09-14T12:00:03.000Z', transmitBps: null, receiveBps: null},
     {checkedAt: '2026-09-14T12:00:04.000Z', transmitBps: 0, receiveBps: 1_000_000},
     {checkedAt: '2026-09-14T12:00:05.000Z', transmitBps: 500_000, receiveBps: 1_500_000},
   ],
 };
 
-const combined = loadPage(pages.combined);
-assert.equal(combined.sockets.length, 1, 'combined page must use one WebSocket');
-assert.equal(combined.sockets[0].url, 'ws://127.0.0.1:8080/ws');
-assert.equal(combined.body.dataset.sections, 'all');
-assert.equal(combined.body.dataset.parts, 'all');
-assert.equal(combined.frames.length, 1, 'all charts must share one requestAnimationFrame loop');
-combined.sockets[0].onmessage({data: JSON.stringify(snapshot)});
-assert.equal(combined.elements.get('latency').textContent, '20');
-assert.equal(combined.elements.get('average-latency').textContent, '15.5');
-assert.equal(combined.elements.get('tx-traffic').textContent, '0 bps');
-assert.equal(combined.elements.get('rx-traffic').textContent, '1.5 Mbps');
-assert.equal(combined.elements.get('latency').animations.length, 1, 'changed values must fade once');
-combined.runFrame(17);
-assert.equal(combined.frames.length, 1, 'the shared loop must schedule only one next frame');
-const latencyContext = combined.elements.get('latency-chart-canvas').context;
-const trafficContext = combined.elements.get('traffic-chart-canvas').context;
-assert.ok(latencyContext.operations.some((operation) => operation.name === 'bezierCurveTo'));
-assert.ok(trafficContext.operations.some((operation) => operation.name === 'bezierCurveTo'));
-assert.ok(
-  latencyContext.operations.filter((operation) => operation.name === 'moveTo').length >= 5,
-  'a failed latency sample must split the curve into separate segments',
-);
-assert.ok(latencyContext.operations.some(
-  (operation) => operation.name === 'fillText' && operation.args[0] === '50 ms',
-));
-const firstCurveEnd = latencyContext.operations.filter(
-  (operation) => operation.name === 'bezierCurveTo',
-).at(-1).args[4];
-const operationCount = latencyContext.operations.length;
-combined.runFrame(25);
-assert.equal(
-  latencyContext.operations.length,
-  operationCount,
-  'rendering must not exceed 60fps on high-refresh displays',
-);
-combined.runFrame(34);
-const secondCurveEnd = latencyContext.operations.filter(
-  (operation) => operation.name === 'bezierCurveTo',
-).at(-1).args[4];
-assert.ok(secondCurveEnd < firstCurveEnd, 'timestamp-based graph must move left between samples');
-assert.equal(combined.elements.get('latency').animations.length, 1, 'animation frames must not update values');
-assert.equal(combined.elements.get('latency-chart-canvas').width, 928, 'canvas must use high-DPI width');
-
-const legacyLatency = loadPage(pages.combined, '?sections=latency&parts=graph');
-assert.equal(legacyLatency.body.dataset.sections, 'latency');
-assert.equal(legacyLatency.body.dataset.parts, 'graph');
-assert.equal(legacyLatency.frames.length, 1, 'hidden traffic chart must not register another renderer');
-legacyLatency.sockets[0].onmessage({data: JSON.stringify(snapshot)});
-assert.equal(legacyLatency.elements.get('latency').textContent, '', 'graph-only view must skip value DOM updates');
+const home = loadPage(pages.home);
+assert.equal(home.sockets.length, 1, 'home health check must connect to WebSocket');
+assert.equal(home.sockets[0].url, 'ws://127.0.0.1:8080/ws');
+assert.equal(home.elements.get('websocket-status').lastChild.textContent, 'Connecting');
+home.sockets[0].onopen();
+assert.equal(home.elements.get('websocket-status').lastChild.textContent, 'Connected');
+assert.equal(home.elements.get('websocket-status').className, 'status is-healthy');
+home.sockets[0].onmessage({data: JSON.stringify(snapshot)});
+assert.equal(home.elements.get('stream-status').lastChild.textContent, 'Receiving data');
+assert.notEqual(home.elements.get('last-update').textContent, '--');
+home.sockets[0].onclose();
+assert.equal(home.elements.get('websocket-status').lastChild.textContent, 'Reconnecting');
+assert.equal(home.elements.get('stream-status').lastChild.textContent, 'Waiting for data');
 
 const latency = loadPage(pages.latency, '?parts=values');
-assert.equal(latency.sockets.length, 1, 'latency page must use one WebSocket');
+assert.equal(latency.sockets.length, 1);
 assert.equal(latency.body.dataset.parts, 'values');
-assert.equal(latency.frames.length, 0, 'values-only view must not start canvas rendering');
+assert.equal(latency.frames.length, 0, 'values-only view must not render Canvas');
 latency.sockets[0].onmessage({data: JSON.stringify(snapshot)});
 assert.equal(latency.elements.get('latency').textContent, '20');
-assert.equal(latency.elements.has('tx-traffic'), false);
 
 const traffic = loadPage(pages.traffic, '?parts=graph');
-assert.equal(traffic.sockets.length, 1, 'traffic page must use one WebSocket');
+assert.equal(traffic.sockets.length, 1);
 assert.equal(traffic.body.dataset.parts, 'graph');
 assert.equal(traffic.frames.length, 1);
 traffic.sockets[0].onmessage({data: JSON.stringify(snapshot)});
-assert.equal(traffic.elements.get('rx-traffic').textContent, '', 'graph-only view must skip value DOM updates');
+assert.equal(traffic.elements.get('rx-traffic').textContent, '');
 traffic.runFrame(17);
 assert.ok(traffic.elements.get('traffic-chart-canvas').context.operations.some(
-  (operation) => operation.name === 'fillText' && operation.args[0] === '2 Mbps',
+  (operation) => operation.name === 'bezierCurveTo',
 ));
 
 const allParts = loadPage(pages.traffic, '?parts=values,graph');

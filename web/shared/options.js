@@ -11,8 +11,4 @@
   namespace.applyPartsOption = function applyPartsOption(search = location.search) {
     document.body.dataset.parts = selection(search, 'parts', ['values', 'graph']);
   };
-
-  namespace.applyLegacySectionsOption = function applyLegacySectionsOption(search = location.search) {
-    document.body.dataset.sections = selection(search, 'sections', ['latency', 'traffic']);
-  };
 }(window.NetworkMonitor = window.NetworkMonitor || {}));

@@ -26,7 +26,7 @@ func TestDisplayHandler(t *testing.T) {
 		present string
 		absent  string
 	}{
-		{path: "/", present: "latency-chart-canvas"},
+		{path: "/", present: "service-status", absent: "chart-canvas"},
 		{path: "/latency", present: "latency-chart-canvas", absent: "traffic-chart-canvas"},
 		{path: "/traffic", present: "traffic-chart-canvas", absent: "latency-chart-canvas"},
 	}
@@ -58,6 +58,7 @@ func TestDisplayHandler(t *testing.T) {
 
 	for _, path := range []string{
 		"/app.js",
+		"/home.css",
 		"/latency/app.js",
 		"/latency/view.js",
 		"/traffic/app.js",

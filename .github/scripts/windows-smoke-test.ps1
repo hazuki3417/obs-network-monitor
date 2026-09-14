@@ -132,8 +132,8 @@ function Test-RunningMonitor {
         if ($null -eq $response -or $response.StatusCode -ne 200) {
             throw "Monitor HTTP endpoint did not become ready in scenario '$Name'."
         }
-        if ($response.Content -notmatch "OBS NETWORK MONITOR") {
-            throw "Embedded monitor UI was not returned in scenario '$Name'."
+        if ($response.Content -notmatch "service-status" -or $response.Content -match "chart-canvas") {
+            throw "Monitor status page was not returned in scenario '$Name'."
         }
 
         $displayPages = @(
