@@ -1,0 +1,99 @@
+name: 不具合報告
+description: 再現可能な不具合を報告する
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        報告ありがとうございます。セキュリティ上の問題はこのフォームへ記載せず、Security Policyから非公開で報告してください。
+
+  - type: input
+    id: version
+    attributes:
+      label: OBS Network Monitorのバージョン
+      description: GitHub Release名、またはソースから実行した場合はコミットIDを記載してください。
+      placeholder: v0.2.0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: windows
+    attributes:
+      label: Windows
+      options:
+        - Windows 11
+        - Windows 10
+        - その他
+    validations:
+      required: true
+
+  - type: input
+    id: obs
+    attributes:
+      label: OBS Studioのバージョン
+      description: OBSを使用していない場合は「未使用」と記載してください。
+      placeholder: 32.0.0 / 未使用
+    validations:
+      required: true
+
+  - type: dropdown
+    id: page
+    attributes:
+      label: 関係する画面
+      multiple: true
+      options:
+        - /（ヘルスチェック）
+        - /latency
+        - /traffic
+        - /route
+        - 起動・終了・ログ
+        - その他
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 再現手順
+      description: 最小限の手順を番号付きで記載してください。
+      placeholder: |
+        1. アプリを起動する
+        2. OBSで…
+        3. …が発生する
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期待する動作
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 実際の動作
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: ログや補足情報
+      description: logs/error.logの関連部分を貼り付けられます。IPアドレス、ホスト名、トークンなどの機密情報は除去してください。
+      render: shell
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 確認事項
+      options:
+        - label: 最新Releaseでも再現することを確認しました。
+          required: true
+        - label: 同じ内容のIssueがないことを確認しました。
+          required: true
+        - label: この報告に機密情報を含めていません。
+          required: true
