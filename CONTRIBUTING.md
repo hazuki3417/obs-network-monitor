@@ -23,10 +23,11 @@ OBS Network Monitorへの改善提案を歓迎します。変更を始める前�
 
 ## 開発と検証
 
-Go 1.22以上とNode.jsを使用します。Node.jsは埋め込みWeb UIのテストにだけ使用し、実行ファイルの動作には不要です。
+Go 1.26以上とNode.jsを使用します。Node.jsは埋め込みWeb UIのテストにだけ使用し、実行ファイルの動作には不要です。
 
 ```powershell
 go test ./...
+node .github/scripts/toolchain-version-test.js
 node .github/scripts/web-ui-test.js
 go build -trimpath -o obs-network-monitor.exe .
 ```
