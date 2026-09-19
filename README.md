@@ -1,5 +1,8 @@
 # OBS Network Monitor
 
+[![Quality Gate](https://github.com/hazuki3417/obs-network-monitor/actions/workflows/quality-gate.yml/badge.svg?branch=develop)](https://github.com/hazuki3417/obs-network-monitor/actions/workflows/quality-gate.yml)
+[![CodeQL](https://github.com/hazuki3417/obs-network-monitor/actions/workflows/codeql.yml/badge.svg?branch=develop)](https://github.com/hazuki3417/obs-network-monitor/actions/workflows/codeql.yml)
+
 Windows PCが現在使用しているネットワークアダプターの通信量とインターネット品質を、OBS Browser Sourceへ表示するローカルモニターです。管理者権限、外部コマンド、外部テレメトリーを必要とせず、Web UIは実行ファイルへ埋め込まれています。
 
 ## 表示内容
