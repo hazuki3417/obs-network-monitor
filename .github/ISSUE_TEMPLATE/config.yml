@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: セキュリティ上の問題
+    url: https://github.com/hazuki3417/obs-network-monitor/security/policy
+    about: 脆弱性は公開Issueへ記載せず、Security Policyに従って報告してください。

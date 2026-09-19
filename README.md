@@ -153,6 +153,13 @@ TracerouteはWindows ICMP APIでTTLを1から最大30まで増やし、各ホッ
 
 [MIT License](LICENSE)です。Copyright (c) 2026 hazuki3417.
 
+## コントリビューションとセキュリティ
+
+- 不具合報告と機能要望は [GitHub Issues](https://github.com/hazuki3417/obs-network-monitor/issues/new/choose) を利用してください。
+- 開発手順とPull Requestの方針は [コントリビューションガイド](CONTRIBUTING.md) を参照してください。
+- 脆弱性の詳細を公開Issueへ投稿せず、[セキュリティポリシー](SECURITY.md)に従って非公開で報告してください。
+- メンテナー向けのGitHub設定は [Security and quality設定](docs/security-and-quality.md) を参照してください。
+
 ## 検証
 
 `develop` 向けPull Request、`develop` へのpush、手動実行で、Windows Quality Gateが次を検証します。
