@@ -17,7 +17,7 @@ Windows PCが現在使用しているネットワークアダプターの通信�
 
 - Windows 10またはWindows 11（64-bit）
 - OBS StudioのBrowser Source、またはWebSocket対応ブラウザ
-- Go 1.22以上（ソースからビルドする場合のみ）
+- Go 1.26以上（ソースからビルドする場合のみ）
 
 ## すぐに使う
 
@@ -165,6 +165,7 @@ TracerouteはWindows ICMP APIでTTLを1から最大30まで増やし、各ホッ
 `develop` 向けPull Request、`develop` へのpush、手動実行で、Windows Quality Gateが次を検証します。
 
 - `go test ./...`
+- Go、Devbox、開発文書のツールチェーンバージョン整合性
 - Windows x64実行ファイルのビルド
 - 設定なし・有効な設定での起動
 - 不正設定の起動拒否

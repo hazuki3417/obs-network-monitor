@@ -34,6 +34,9 @@ jobs:
       - name: Run tests
         run: go test ./...
 
+      - name: Verify toolchain versions
+        run: node .github/scripts/toolchain-version-test.js
+
       - name: Test embedded Web UI
         run: node .github/scripts/web-ui-test.js
 
