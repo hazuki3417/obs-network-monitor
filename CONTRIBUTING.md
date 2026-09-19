@@ -32,6 +32,20 @@ node .github/scripts/web-ui-test.js
 go build -trimpath -o obs-network-monitor.exe .
 ```
 
+OBSオーバーレイの画像比較にはPlaywrightを使用します。初回だけChromiumをインストールしてください。
+
+```powershell
+npm ci
+npx playwright install chromium
+npm run test:visual
+```
+
+意図したUI変更に合わせて基準画像とREADME画像を更新する場合は、次を実行して差分画像を確認してください。
+
+```powershell
+npm run test:visual:update
+```
+
 Windows固有API、実行ファイル、WebSocket契約は、Pull Requestで起動するWindows Quality Gateでも検証されます。UIを変更した場合は、通常ブラウザだけでなくOBS Browser Sourceでも推奨サイズの表示を確認してください。
 
 ## コードとコミット

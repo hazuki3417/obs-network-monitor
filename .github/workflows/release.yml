@@ -130,6 +130,8 @@ jobs:
           Copy-Item config.example.json $package/
           Copy-Item README.md $package/
           Copy-Item LICENSE $package/
+          New-Item -ItemType Directory -Force "$package/docs/images" | Out-Null
+          Copy-Item docs/images/*.png "$package/docs/images/"
           Compress-Archive -Path "$package/*" -DestinationPath $archive
 
           $hash = (Get-FileHash -Path $archive -Algorithm SHA256).Hash.ToLowerInvariant()

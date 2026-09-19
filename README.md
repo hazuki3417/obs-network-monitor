@@ -16,6 +16,22 @@ Windows PCが現在使用しているネットワークアダプターの通信�
 
 測定値をそのまま表示し、回線品質の良否は判定しません。
 
+## 画面イメージ
+
+スクリーンショットはOBSの推奨サイズで撮影しています。実際のBrowser Sourceでは背景が透明になり、配信映像へ直接重ねて表示されます。ここでは視認しやすいよう暗色の背景を付けています。
+
+### Latency
+
+![Latency overlay](docs/images/latency.png)
+
+### NIC Traffic
+
+![NIC traffic overlay](docs/images/traffic.png)
+
+### Route
+
+![Anonymized route overlay](docs/images/route.png)
+
 ## 必要環境
 
 - Windows 10またはWindows 11（64-bit）
@@ -32,7 +48,7 @@ Windows PCが現在使用しているネットワークアダプターの通信�
 4. ブラウザで `http://127.0.0.1:8080/` を開き、ヘルスチェックが正常であることを確認する。
 5. 終了するときは、同じページの **Stop application** を押す。
 
-ZIPにはexe、README、設定例、MIT Licenseが含まれます。成果物は署名されていないため、Windowsが発行元を確認できない旨を表示する場合があります。必要に応じて同じReleaseの `.sha256` ファイルで整合性を確認してください。
+ZIPにはexe、README、設定例、README用画面イメージ、MIT Licenseが含まれます。成果物は署名されていないため、Windowsが発行元を確認できない旨を表示する場合があります。必要に応じて同じReleaseの `.sha256` ファイルで整合性を確認してください。
 
 ### ソースから実行
 
@@ -169,6 +185,7 @@ TracerouteはWindows ICMP APIでTTLを1から最大30まで増やし、各ホッ
 
 - `go test ./...`
 - Go、Devbox、開発文書のツールチェーンバージョン整合性
+- PlaywrightによるOBSオーバーレイの画像比較
 - Windows x64実行ファイルのビルド
 - 設定なし・有効な設定での起動
 - 不正設定の起動拒否
