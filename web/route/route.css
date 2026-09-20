@@ -33,6 +33,15 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.route-title {
+  margin: 0 0 8px;
+  color: var(--text);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: 1;
+}
+
 .route-nodes {
   display: grid;
   gap: 0;
