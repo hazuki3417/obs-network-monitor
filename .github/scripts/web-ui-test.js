@@ -101,6 +101,7 @@ assert.doesNotMatch(pages.latency.html, /id="traffic-chart-canvas"/);
 assert.match(pages.traffic.html, /id="traffic-chart-canvas"/);
 assert.doesNotMatch(pages.traffic.html, /id="latency-chart-canvas"/);
 assert.match(pages.route.html, /id="route-nodes"/);
+assert.match(pages.route.html, /class="route-title">ROUTE<\/h2>/);
 assert.doesNotMatch(pages.route.html, /chart-canvas|parts=/);
 assert.match(overlayCSS, /data-parts="values"/);
 assert.match(overlayCSS, /data-parts="graph"/);

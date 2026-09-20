@@ -102,7 +102,7 @@ async function openOverlay(page, route, readySelector, readyText) {
 const cases = [
   {name: 'latency', route: '/latency', viewport: {width: 480, height: 270}, ready: '#latency', readyText: '27'},
   {name: 'traffic', route: '/traffic', viewport: {width: 480, height: 210}, ready: '#tx-traffic', readyText: '824'},
-  {name: 'route', route: '/route', viewport: {width: 480, height: 300}, ready: '#route-nodes', readyText: 'TARGET'},
+  {name: 'route', route: '/route', viewport: {width: 480, height: 340}, ready: '#route-nodes', readyText: 'TARGET'},
 ];
 
 for (const example of cases) {

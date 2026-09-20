@@ -116,7 +116,7 @@ OBS向け表示は背景、パネル、NIC情報を表示せず、透明背景�
 | --- | --- | --- |
 | 遅延のみ | `http://127.0.0.1:8080/latency` | 480 x 270 |
 | NIC通信量のみ | `http://127.0.0.1:8080/traffic` | 480 x 210 |
-| 匿名化した経路 | `http://127.0.0.1:8080/route` | 480 x 300 |
+| 匿名化した経路 | `http://127.0.0.1:8080/route` | 480 x 340 |
 
 各セクションの数値とグラフは、同じBrowser SourceとWebSocket接続のまま `parts` で切り替えられます。
 
@@ -153,7 +153,7 @@ TracerouteはWindows ICMP APIでTTLを1から最大30まで増やし、各ホッ
 | NICが未接続・状態不明になる | インターネット経路、VPN、指定したICMP測定先へのIPv4経路を確認する |
 | HTTPへ切り替わる | ネットワークまたは測定先がICMP Echoを許可しているか確認する |
 | 測定値が更新されない | ルートのヘルスチェックを確認し、OBSのURLが `/latency`、`/traffic`、`/route` のいずれか確認する |
-| OBS向け表示が見切れる | Latencyは480 x 270、NIC Trafficは480 x 210、Routeは480 x 300にする |
+| OBS向け表示が見切れる | Latencyは480 x 270、NIC Trafficは480 x 210、Routeは480 x 340にする |
 
 設定、測定、NIC取得、Traceroute、WebSocket、HTTPサーバーのエラーは、exeと同じフォルダーの `logs/error.log` へ記録します。正常時は `logs` フォルダーを作成しません。ログが5 MiBへ達すると `error.previous.log` へ1世代だけローテーションします。
 
