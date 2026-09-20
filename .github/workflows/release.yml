@@ -31,7 +31,7 @@ jobs:
 
     steps:
       - name: Check out release target
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -87,12 +87,12 @@ jobs:
 
     steps:
       - name: Check out release commit
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ needs.prepare.outputs.release_sha }}
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
           cache: true
@@ -130,6 +130,8 @@ jobs:
           Copy-Item config.example.json $package/
           Copy-Item README.md $package/
           Copy-Item LICENSE $package/
+          New-Item -ItemType Directory -Force "$package/docs/images" | Out-Null
+          Copy-Item docs/images/*.png "$package/docs/images/"
           Compress-Archive -Path "$package/*" -DestinationPath $archive
 
           $hash = (Get-FileHash -Path $archive -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -137,7 +139,7 @@ jobs:
             Set-Content -Path $checksum -Encoding ascii
 
       - name: Upload release assets
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-assets
           path: |
@@ -157,7 +159,7 @@ jobs:
 
     steps:
       - name: Download release assets
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: release-assets
           path: dist

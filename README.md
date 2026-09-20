@@ -1,5 +1,8 @@
 # OBS Network Monitor
 
+[![Quality Gate](https://github.com/hazuki3417/obs-network-monitor/actions/workflows/quality-gate.yml/badge.svg?branch=develop)](https://github.com/hazuki3417/obs-network-monitor/actions/workflows/quality-gate.yml)
+[![CodeQL](https://github.com/hazuki3417/obs-network-monitor/actions/workflows/codeql.yml/badge.svg?branch=develop)](https://github.com/hazuki3417/obs-network-monitor/actions/workflows/codeql.yml)
+
 Windows PCが現在使用しているネットワークアダプターの通信量とインターネット品質を、OBS Browser Sourceへ表示するローカルモニターです。管理者権限、外部コマンド、外部テレメトリーを必要とせず、Web UIは実行ファイルへ埋め込まれています。
 
 ## 表示内容
@@ -13,11 +16,27 @@ Windows PCが現在使用しているネットワークアダプターの通信�
 
 測定値をそのまま表示し、回線品質の良否は判定しません。
 
+## 画面イメージ
+
+スクリーンショットはOBSの推奨サイズで撮影しています。実際のBrowser Sourceでは背景が透明になり、配信映像へ直接重ねて表示されます。ここでは視認しやすいよう暗色の背景を付けています。
+
+### Latency
+
+![Latency overlay](docs/images/latency.png)
+
+### NIC Traffic
+
+![NIC traffic overlay](docs/images/traffic.png)
+
+### Route
+
+![Anonymized route overlay](docs/images/route.png)
+
 ## 必要環境
 
 - Windows 10またはWindows 11（64-bit）
 - OBS StudioのBrowser Source、またはWebSocket対応ブラウザ
-- Go 1.22以上（ソースからビルドする場合のみ）
+- Go 1.26以上（ソースからビルドする場合のみ）
 
 ## すぐに使う
 
@@ -29,7 +48,7 @@ Windows PCが現在使用しているネットワークアダプターの通信�
 4. ブラウザで `http://127.0.0.1:8080/` を開き、ヘルスチェックが正常であることを確認する。
 5. 終了するときは、同じページの **Stop application** を押す。
 
-ZIPにはexe、README、設定例、MIT Licenseが含まれます。成果物は署名されていないため、Windowsが発行元を確認できない旨を表示する場合があります。必要に応じて同じReleaseの `.sha256` ファイルで整合性を確認してください。
+ZIPにはexe、README、設定例、README用画面イメージ、MIT Licenseが含まれます。成果物は署名されていないため、Windowsが発行元を確認できない旨を表示する場合があります。必要に応じて同じReleaseの `.sha256` ファイルで整合性を確認してください。
 
 ### ソースから実行
 
@@ -97,7 +116,7 @@ OBS向け表示は背景、パネル、NIC情報を表示せず、透明背景�
 | --- | --- | --- |
 | 遅延のみ | `http://127.0.0.1:8080/latency` | 480 x 270 |
 | NIC通信量のみ | `http://127.0.0.1:8080/traffic` | 480 x 210 |
-| 匿名化した経路 | `http://127.0.0.1:8080/route` | 480 x 300 |
+| 匿名化した経路 | `http://127.0.0.1:8080/route` | 480 x 340 |
 
 各セクションの数値とグラフは、同じBrowser SourceとWebSocket接続のまま `parts` で切り替えられます。
 
@@ -134,7 +153,7 @@ TracerouteはWindows ICMP APIでTTLを1から最大30まで増やし、各ホッ
 | NICが未接続・状態不明になる | インターネット経路、VPN、指定したICMP測定先へのIPv4経路を確認する |
 | HTTPへ切り替わる | ネットワークまたは測定先がICMP Echoを許可しているか確認する |
 | 測定値が更新されない | ルートのヘルスチェックを確認し、OBSのURLが `/latency`、`/traffic`、`/route` のいずれか確認する |
-| OBS向け表示が見切れる | Latencyは480 x 270、NIC Trafficは480 x 210、Routeは480 x 300にする |
+| OBS向け表示が見切れる | Latencyは480 x 270、NIC Trafficは480 x 210、Routeは480 x 340にする |
 
 設定、測定、NIC取得、Traceroute、WebSocket、HTTPサーバーのエラーは、exeと同じフォルダーの `logs/error.log` へ記録します。正常時は `logs` フォルダーを作成しません。ログが5 MiBへ達すると `error.previous.log` へ1世代だけローテーションします。
 
@@ -153,11 +172,20 @@ TracerouteはWindows ICMP APIでTTLを1から最大30まで増やし、各ホッ
 
 [MIT License](LICENSE)です。Copyright (c) 2026 hazuki3417.
 
+## コントリビューションとセキュリティ
+
+- 不具合報告と機能要望は [GitHub Issues](https://github.com/hazuki3417/obs-network-monitor/issues/new/choose) を利用してください。
+- 開発手順とPull Requestの方針は [コントリビューションガイド](CONTRIBUTING.md) を参照してください。
+- 脆弱性の詳細を公開Issueへ投稿せず、[セキュリティポリシー](SECURITY.md)に従って非公開で報告してください。
+- メンテナー向けのGitHub設定は [Security and quality設定](docs/security-and-quality.md) を参照してください。
+
 ## 検証
 
 `develop` 向けPull Request、`develop` へのpush、手動実行で、Windows Quality Gateが次を検証します。
 
 - `go test ./...`
+- Go、Devbox、開発文書のツールチェーンバージョン整合性
+- PlaywrightによるOBSオーバーレイの画像比較
 - Windows x64実行ファイルのビルド
 - 設定なし・有効な設定での起動
 - 不正設定の起動拒否

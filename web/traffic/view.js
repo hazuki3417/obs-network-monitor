@@ -41,6 +41,7 @@
         height: 96,
         minimum: 1000,
         emptyLabel: '--',
+        scaleValue: (value) => speedScale(value).maximum,
         scaleLabel: (maximum) => speedScale(maximum).label,
         series: [
           {key: 'transmitBps', color: 'transmit'},

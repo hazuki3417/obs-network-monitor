@@ -286,7 +286,7 @@ WebSocketでは次の構造をJSONで配信する。測定成功値がまだな�
 
 OBS表示は透明なオーバーレイとし、背景、外枠、パネル、カード、全体タイトル、NIC名・状態・リンク速度、測定先、配信状態を表示しない。ルート `/` は通常ブラウザ向けの案内ページとし、OBS表示には使用しない。
 
-OBS向け表示は `/latency`、`/traffic`、`/route` の3ページで構成する。`/latency` は遅延だけを480 x 270 px、`/traffic` はNIC通信量だけを480 x 210 px、`/route` は匿名化した経路を480 x 300 pxで表示する。複数を表示する場合は、OBSで独立したBrowser Sourceとして配置する。未知のパスは404を返す。
+OBS向け表示は `/latency`、`/traffic`、`/route` の3ページで構成する。`/latency` は遅延だけを480 x 270 px、`/traffic` はNIC通信量だけを480 x 210 px、`/route` は匿名化した経路を480 x 340 pxで表示する。複数を表示する場合は、OBSで独立したBrowser Sourceとして配置する。未知のパスは404を返す。
 
 ルート `/` にはLocal Web Server、WebSocket接続、モニターデータ受信の状態、最終更新時刻、確認付きのアプリ終了ボタンを表示する。状態アイコンと文言は固定幅の列で開始位置を揃える。あわせて `/latency`、`/traffic`、`/route`、GitHubリポジトリ、READMEの使い方をURLが見える箇条書きで表示し、フッターにMIT Licenseへのリンク、`© 2026 hazuki3417`、制作者を表示する。
 

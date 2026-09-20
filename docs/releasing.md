@@ -91,6 +91,7 @@ ZIPには次のファイルが含まれます。
 - `config.example.json`
 - `README.md`
 - `LICENSE`
+- `docs/images/*.png`（README用の画面イメージ）
 
 成果物はコード署名されていません。チェックサムはダウンロード破損や意図しない差し替えの確認に使用できます。
 
