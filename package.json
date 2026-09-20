@@ -1,0 +1,11 @@
+{
+  "name": "obs-network-monitor-web-tests",
+  "private": true,
+  "scripts": {
+    "test:visual": "playwright test",
+    "test:visual:update": "playwright test --update-snapshots"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0"
+  }
+}

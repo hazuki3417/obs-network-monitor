@@ -98,8 +98,9 @@
       });
       context.stroke();
 
-      const maximum = state.hasValues ? compactNumber(state.maximum) : '--';
-      const middle = state.hasValues ? compactNumber(state.maximum / 2) : '--';
+      const scaleValue = options.scaleValue || compactNumber;
+      const maximum = state.hasValues ? scaleValue(state.maximum) : '--';
+      const middle = state.hasValues ? scaleValue(state.maximum / 2) : '--';
       context.fillStyle = palette.muted;
       context.font = '700 9px Inter, Segoe UI, sans-serif';
       context.textAlign = 'right';
